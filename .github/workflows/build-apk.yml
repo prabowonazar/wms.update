@@ -29,14 +29,14 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
 
       - name: Install Node Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Vite Web Project
         run: npm run build
 
       - name: Initialize & Sync Capacitor Android
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install --legacy-peer-deps @capacitor/core @capacitor/cli @capacitor/android
           if [ ! -f "capacitor.config.json" ]; then
             npx cap init "ScanGudang WMS" "com.scangudang.wms" --web-dir dist
           fi
