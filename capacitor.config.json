@@ -1,0 +1,8 @@
+{
+  "appId": "com.scangudang.wms",
+  "appName": "ScanGudang WMS",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
