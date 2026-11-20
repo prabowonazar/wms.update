@@ -231,19 +231,19 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
   const discrepancyItems = activeSession?.items.filter((it) => it.difference !== 0) || [];
 
   return (
-    <div className="space-y-4 pb-12">
+    <div className="space-y-4 px-1 py-1 font-sans select-none pb-12">
       {/* Sesi Opname Header & Switcher */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20">
+      <section className="bg-white border border-zinc-200/90 rounded-3xl p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 bg-purple-50 text-purple-700 rounded-xl border border-purple-200 shrink-0">
               <Calculator className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+            <div className="min-w-0">
+              <h2 className="text-xs font-black text-zinc-950 uppercase tracking-wider truncate">
                 Hitung Opname (Rekonsel)
               </h2>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500 truncate">
                 Sesi Hitung Fisik vs Saldo Sistem Real-Time (Rekonsiliasi)
               </p>
             </div>
@@ -252,9 +252,9 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
           <button
             type="button"
             onClick={() => setIsCreatingSession(!isCreatingSession)}
-            className="text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+            className="text-[11px] font-extrabold bg-[#C6F232] hover:bg-[#B8E62B] text-zinc-950 px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow-xs shrink-0"
           >
-            <Plus className="w-3.5 h-3.5" /> Sesi Baru
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Sesi Baru
           </button>
         </div>
 
@@ -262,34 +262,40 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
         {isCreatingSession && (
           <form
             onSubmit={handleCreateNewSession}
-            className="p-3 mb-3 bg-zinc-950 border border-amber-500/40 rounded-xl space-y-2.5 animate-in fade-in"
+            className="p-3.5 mb-3 bg-[#F4F5F7] border border-amber-300 rounded-2xl space-y-2.5 animate-in fade-in"
           >
-            <div className="text-xs font-bold text-amber-300">Mulai Sesi Hitung Baru</div>
+            <div className="text-xs font-extrabold text-zinc-950">Mulai Sesi Hitung Baru</div>
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Nama / Judul Sesi Sensus</label>
+              <label className="text-[11px] font-bold text-zinc-700 block mb-1">
+                Nama / Judul Sesi Sensus
+              </label>
               <input
                 type="text"
                 value={newSessionTitle}
                 onChange={(e) => setNewSessionTitle(e.target.value)}
                 placeholder="Contoh: Opname Akhir Pekan - Rak A (Komponen)"
                 required
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[11px] text-zinc-400 block mb-1">Zona / Rak Target</label>
+                <label className="text-[11px] font-bold text-zinc-700 block mb-1">
+                  Zona / Rak Target
+                </label>
                 <input
                   type="text"
                   value={newSessionZone}
                   onChange={(e) => setNewSessionZone(e.target.value)}
                   placeholder="Zona A, Rak 01 - 04"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-zinc-400 block mb-1">Lokasi Gudang</label>
-                <div className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-bold text-amber-400">
+                <label className="text-[11px] font-bold text-zinc-700 block mb-1">
+                  Lokasi Gudang
+                </label>
+                <div className="px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-bold text-zinc-950">
                   {activeWarehouse}
                 </div>
               </div>
@@ -298,13 +304,13 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCreatingSession(false)}
-                className="px-3 py-1 text-xs text-zinc-400 hover:text-white"
+                className="px-3 py-1.5 text-xs font-bold text-zinc-600 hover:text-zinc-900 cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 bg-[#18181B] hover:bg-zinc-800 text-[#C6F232] text-xs font-bold rounded-xl cursor-pointer"
               >
                 Mulai Sesi Sekarang
               </button>
@@ -314,50 +320,56 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
         {/* Active Session Card */}
         {activeSession ? (
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="font-mono text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                <span className="font-mono text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-200">
                   {activeSession.code}
                 </span>
-                <h3 className="text-xs font-bold text-white mt-1">{activeSession.title}</h3>
-                <p className="text-[11px] text-zinc-400">
-                  Gudang: <span className="text-zinc-200">{activeSession.warehouse}</span> · PIC:{' '}
-                  <span className="text-zinc-200">{activeSession.operatorName}</span>
+                <h3 className="text-xs font-extrabold text-zinc-950 mt-1.5">
+                  {activeSession.title}
+                </h3>
+                <p className="text-[11px] text-zinc-600 mt-0.5">
+                  Gudang:{' '}
+                  <span className="text-zinc-900 font-semibold">{activeSession.warehouse}</span> ·
+                  PIC:{' '}
+                  <span className="text-zinc-900 font-semibold">{activeSession.operatorName}</span>
                 </p>
               </div>
 
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                     activeSession.status === 'active'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-zinc-800 text-zinc-400'
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-zinc-200 text-zinc-600'
                   }`}
                 >
                   {activeSession.status === 'active' ? '● SESI AKTIF' : 'SELESAI'}
                 </span>
-                <div className="text-[11px] text-zinc-400 mt-1">
-                  Progress: <strong className="text-amber-400">{totalItemsCounted}</strong> /{' '}
+                <div className="text-[11px] text-zinc-600 mt-1.5 font-mono">
+                  Progress: <strong className="text-zinc-950">{totalItemsCounted}</strong> /{' '}
                   {totalItemsTarget} Item
                 </div>
               </div>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full bg-zinc-200 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
                 style={{
                   width: `${
-                    totalItemsTarget > 0 ? (totalItemsCounted / totalItemsTarget) * 100 : 0
+                    totalItemsTarget > 0
+                      ? Math.min(100, (totalItemsCounted / totalItemsTarget) * 100)
+                      : 0
                   }%`,
                 }}
               />
             </div>
           </div>
         ) : (
-          <div className="text-xs text-zinc-400 py-3 text-center">
+          <div className="text-xs text-zinc-500 py-3 text-center">
             Belum ada sesi opname aktif. Silakan klik &quot;Sesi Baru&quot;.
           </div>
         )}
@@ -365,17 +377,17 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
       {/* Sub Fitur 2 & 3: Scan dan Bandingkan + Input Jumlah Fisik */}
       {activeSession && (
-        <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+        <section className="bg-white border border-zinc-200/90 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-zinc-100 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-[#18181B] text-[#C6F232] rounded-xl">
                 <Scan className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h3 className="text-xs font-black text-zinc-950 uppercase tracking-wider">
                   Scan & Bandingkan Fisik
                 </h3>
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-zinc-500">
                   Arahkan scanner ke barang untuk update hitungan fisik
                 </p>
               </div>
@@ -385,10 +397,10 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
               <button
                 type="button"
                 onClick={() => setRapidIncrementMode(!rapidIncrementMode)}
-                className={`text-[10px] px-2 py-1 rounded-lg border font-mono transition-colors ${
+                className={`text-[10px] px-2.5 py-1.5 rounded-xl border font-mono font-bold transition-colors cursor-pointer ${
                   rapidIncrementMode
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-[#F4F5F7] text-zinc-600 border-zinc-200'
                 }`}
                 title="Tiap scan langsung menambah +1"
               >
@@ -398,7 +410,7 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
               <button
                 type="button"
                 onClick={() => setShowScanner(!showScanner)}
-                className="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 rounded-lg border border-zinc-700 cursor-pointer"
+                className="text-[11px] font-bold bg-[#18181B] hover:bg-zinc-800 text-[#C6F232] px-3 py-1.5 rounded-xl cursor-pointer transition-colors"
               >
                 {showScanner ? 'Tutup Kamera' : 'Buka Kamera'}
               </button>
@@ -417,18 +429,20 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
           {/* Active Item Discrepancy Card */}
           {activeItemCount ? (
-            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            <div className="bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-zinc-950 bg-[#C6F232] px-2 py-0.5 rounded-lg">
                       {activeItemCount.sku}
                     </span>
-                    <span className="text-[11px] text-zinc-400 font-mono">
-                      Rak: <strong className="text-zinc-200">{activeItemCount.binLocation}</strong>
+                    <span className="text-[11px] text-zinc-600 font-mono">
+                      Rak: <strong className="text-zinc-950">{activeItemCount.binLocation}</strong>
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white mt-1">{activeItemCount.name}</h4>
+                  <h4 className="text-sm font-extrabold text-zinc-950 mt-1.5">
+                    {activeItemCount.name}
+                  </h4>
                   <p className="font-mono text-[11px] text-zinc-500">
                     Barcode: {activeItemCount.barcode}
                   </p>
@@ -436,12 +450,12 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
                 {/* Variance Status Pill */}
                 <div
-                  className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 shrink-0 ${
                     activeItemCount.difference === 0
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                       : activeItemCount.difference > 0
-                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                      : 'bg-red-500/15 text-red-400 border-red-500/30'
+                      ? 'bg-amber-100 text-amber-800 border-amber-200'
+                      : 'bg-red-100 text-red-700 border-red-200'
                   }`}
                 >
                   {activeItemCount.difference === 0 ? (
@@ -462,30 +476,30 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
               {/* Side by side comparison: Sistem vs Fisik */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl text-center">
-                  <span className="text-[10px] uppercase font-mono text-zinc-400 block mb-0.5">
+                <div className="p-3 bg-white border border-zinc-200 rounded-2xl text-center">
+                  <span className="text-[10px] uppercase font-mono font-bold text-zinc-500 block mb-0.5">
                     Saldo Sistem WMS
                   </span>
-                  <span className="text-2xl font-black font-mono text-zinc-200">
+                  <span className="text-2xl font-black font-mono text-zinc-950">
                     {activeItemCount.systemStock}
                   </span>
                   <span className="text-[10px] text-zinc-500 block">Unit Terdaftar</span>
                 </div>
 
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center">
-                  <span className="text-[10px] uppercase font-mono text-amber-400 block mb-0.5">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-center">
+                  <span className="text-[10px] uppercase font-mono font-bold text-amber-800 block mb-0.5">
                     Hitungan Fisik Nyata
                   </span>
-                  <span className="text-2xl font-black font-mono text-amber-300">
+                  <span className="text-2xl font-black font-mono text-amber-700">
                     {activeItemCount.physicalCount}
                   </span>
-                  <span className="text-[10px] text-amber-500/80 block">Hasil Scan Gudang</span>
+                  <span className="text-[10px] text-amber-700/80 block">Hasil Scan Gudang</span>
                 </div>
               </div>
 
               {/* Quick Input Counter & Keypad Buttons */}
               <div className="space-y-2 pt-2">
-                <div className="text-[11px] font-semibold text-zinc-400">
+                <div className="text-[11px] font-bold text-zinc-700">
                   Input Jumlah Fisik Cepat:
                 </div>
 
@@ -493,37 +507,37 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
                   <button
                     type="button"
                     onClick={() => handleManualCountChange(activeItemCount.physicalCount + 1)}
-                    className="p-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                    className="p-2.5 bg-white hover:bg-zinc-100 border border-zinc-200 active:scale-95 text-zinc-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                   >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" /> 1
+                    <Plus className="w-3.5 h-3.5 text-emerald-600" /> 1
                   </button>
                   <button
                     type="button"
                     onClick={() => handleManualCountChange(activeItemCount.physicalCount + 5)}
-                    className="p-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                    className="p-2.5 bg-white hover:bg-zinc-100 border border-zinc-200 active:scale-95 text-zinc-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                   >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" /> 5
+                    <Plus className="w-3.5 h-3.5 text-emerald-600" /> 5
                   </button>
                   <button
                     type="button"
                     onClick={() => handleManualCountChange(activeItemCount.physicalCount + 10)}
-                    className="p-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                    className="p-2.5 bg-white hover:bg-zinc-100 border border-zinc-200 active:scale-95 text-zinc-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                   >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" /> 10
+                    <Plus className="w-3.5 h-3.5 text-emerald-600" /> 10
                   </button>
                   <button
                     type="button"
                     onClick={() =>
                       handleManualCountChange(Math.max(0, activeItemCount.physicalCount - 1))
                     }
-                    className="p-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                    className="p-2.5 bg-white hover:bg-zinc-100 border border-zinc-200 active:scale-95 text-zinc-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                   >
-                    <Minus className="w-3.5 h-3.5 text-red-400" /> 1
+                    <Minus className="w-3.5 h-3.5 text-red-600" /> 1
                   </button>
                   <button
                     type="button"
                     onClick={() => handleManualCountChange(0)}
-                    className="p-2.5 bg-zinc-800 hover:bg-red-950/60 active:scale-95 text-zinc-300 hover:text-red-400 font-bold text-xs rounded-xl flex items-center justify-center cursor-pointer"
+                    className="p-2.5 bg-white hover:bg-red-50 border border-zinc-200 hover:border-red-200 active:scale-95 text-zinc-700 hover:text-red-600 font-bold text-xs rounded-xl flex items-center justify-center cursor-pointer shadow-2xs"
                   >
                     Reset
                   </button>
@@ -531,18 +545,20 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
 
                 {/* Direct Numeric Input */}
                 <div className="flex gap-2 items-center pt-1">
-                  <span className="text-[11px] text-zinc-400 whitespace-nowrap">Input Angka:</span>
+                  <span className="text-[11px] font-semibold text-zinc-600 whitespace-nowrap">
+                    Input Angka:
+                  </span>
                   <input
                     type="number"
                     min="0"
                     value={activeItemCount.physicalCount}
                     onChange={(e) => handleManualCountChange(parseInt(e.target.value) || 0)}
-                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-mono font-bold text-white text-center focus:outline-none focus:border-amber-500"
+                    className="flex-1 bg-white border border-zinc-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-zinc-950 text-center focus:outline-none focus:border-zinc-900"
                   />
                   <button
                     type="button"
                     onClick={() => handleManualCountChange(activeItemCount.systemStock)}
-                    className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium rounded-lg whitespace-nowrap cursor-pointer"
+                    className="px-3 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-[11px] font-bold rounded-xl whitespace-nowrap cursor-pointer"
                     title="Set fisik sama dengan sistem"
                   >
                     Samakan Sistem
@@ -551,7 +567,7 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-zinc-950 rounded-xl text-center text-xs text-zinc-400">
+            <div className="p-4 bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl text-center text-xs text-zinc-500">
               Pilih item dari daftar di bawah atau scan barcode untuk mulai menghitung.
             </div>
           )}
@@ -559,67 +575,96 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
           {/* Quick Select Item List inside active session */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-white">Item Dalam Sesi Hitung:</span>
+              <span className="font-black text-zinc-950">Item Dalam Sesi Hitung:</span>
               <button
                 type="button"
                 onClick={onOpenTestBarcodes}
-                className="text-amber-400 hover:text-amber-300 text-[11px] font-medium underline flex items-center gap-1 cursor-pointer"
+                className="text-zinc-800 hover:text-zinc-950 bg-[#F4F5F7] hover:bg-zinc-200 px-2.5 py-1 rounded-xl border border-zinc-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
               >
-                <Sparkles className="w-3 h-3" /> Lembar Barcode
+                <Sparkles className="w-3 h-3 text-amber-500" /> Lembar Barcode
               </button>
             </div>
 
             <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
-              {activeSession.items.map((item) => (
-                <div
-                  key={item.sku}
-                  onClick={() => {
-                    setSelectedSku(item.sku);
-                    setActiveItemCount(item);
-                  }}
-                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
-                    selectedSku === item.sku
-                      ? 'bg-amber-500/10 border-amber-500/50'
-                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[11px] font-bold text-amber-400">
-                      {item.sku}
-                    </span>
-                    <span className="text-zinc-200 truncate">{item.name}</span>
-                  </div>
+              {activeSession.items.map((item) => {
+                const isSelected = selectedSku === item.sku;
+                return (
+                  <div
+                    key={item.sku}
+                    onClick={() => {
+                      setSelectedSku(item.sku);
+                      setActiveItemCount(item);
+                    }}
+                    className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
+                      isSelected
+                        ? 'bg-[#18181B] border-zinc-900 text-white shadow-sm'
+                        : 'bg-[#F4F5F7] border-zinc-200/80 hover:bg-zinc-100 text-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`font-mono text-[11px] font-bold ${
+                          isSelected ? 'text-[#C6F232]' : 'text-zinc-950'
+                        }`}
+                      >
+                        {item.sku}
+                      </span>
+                      <span
+                        className={`truncate font-semibold ${
+                          isSelected ? 'text-zinc-100' : 'text-zinc-800'
+                        }`}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] text-zinc-400 font-mono">
-                      Sistem: <strong className="text-zinc-200">{item.systemStock}</strong> | Fisik:{' '}
-                      <strong className="text-amber-300">{item.physicalCount}</strong>
-                    </span>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span
+                        className={`text-[11px] font-mono ${
+                          isSelected ? 'text-zinc-300' : 'text-zinc-600'
+                        }`}
+                      >
+                        Sistem:{' '}
+                        <strong className={isSelected ? 'text-white' : 'text-zinc-950'}>
+                          {item.systemStock}
+                        </strong>{' '}
+                        | Fisik:{' '}
+                        <strong className={isSelected ? 'text-[#C6F232]' : 'text-amber-700'}>
+                          {item.physicalCount}
+                        </strong>
+                      </span>
 
-                    <span
-                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                        item.difference === 0
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : item.difference > 0
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-red-500/20 text-red-400'
-                      }`}
-                    >
-                      {item.difference > 0 ? `+${item.difference}` : item.difference}
-                    </span>
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                          item.difference === 0
+                            ? isSelected
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : 'bg-emerald-100 text-emerald-700'
+                            : item.difference > 0
+                            ? isSelected
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-amber-100 text-amber-800'
+                            : isSelected
+                            ? 'bg-red-500/20 text-red-300'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {item.difference > 0 ? `+${item.difference}` : item.difference}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Selesaikan Sesi & Terapkan Opname */}
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between">
+          <div className="p-3.5 bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                <FileCheck2 className="w-4 h-4 text-emerald-400" /> Selesaikan Sesi & Buat Jurnal
+              <div className="text-xs font-extrabold text-zinc-950 flex items-center gap-1.5">
+                <FileCheck2 className="w-4 h-4 text-emerald-600" /> Selesaikan Sesi & Buat Jurnal
               </div>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500">
                 Sesuaikan saldo stok & update kartu stok otomatis
               </p>
             </div>
@@ -627,7 +672,7 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
             <button
               type="button"
               onClick={handleFinishOpname}
-              className="px-4 py-2.5 bg-[#c8f53c] hover:bg-[#b8e830] active:scale-95 text-black font-extrabold text-xs rounded-xl shadow-md shadow-[#c8f53c]/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 bg-[#C6F232] hover:bg-[#B8E62B] active:scale-95 text-zinc-950 font-extrabold text-xs rounded-xl shadow-md shadow-[#C6F232]/25 transition-all cursor-pointer"
             >
               Terapkan Opname
             </button>
@@ -637,3 +682,4 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
     </div>
   );
 };
+
