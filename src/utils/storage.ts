@@ -218,9 +218,17 @@ export class StorageService {
     this.setItem(KEYS.ACCURATE_RECORDS, records);
   }
 
-  // View Mode
+  // View Mode (Default fullscreen responsive for mobile & APK)
   static getViewMode(): 'mobile_frame' | 'responsive' {
-    return this.getItem(KEYS.VIEW_MODE, 'mobile_frame');
+    if (typeof window !== 'undefined') {
+      const migrated = localStorage.getItem('scangudang_fullscreen_migrated_v1');
+      if (!migrated) {
+        this.setItem(KEYS.VIEW_MODE, 'responsive');
+        localStorage.setItem('scangudang_fullscreen_migrated_v1', '1');
+        return 'responsive';
+      }
+    }
+    return this.getItem(KEYS.VIEW_MODE, 'responsive');
   }
 
   static setViewMode(mode: 'mobile_frame' | 'responsive'): void {

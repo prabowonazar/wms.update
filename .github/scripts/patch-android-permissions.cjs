@@ -40,15 +40,30 @@ if (fs.existsSync(javaMain)) {
     '',
     'import android.Manifest;',
     'import android.content.pm.PackageManager;',
+    'import android.graphics.Color;',
     'import android.os.Bundle;',
+    'import android.view.Window;',
     'import androidx.core.app.ActivityCompat;',
     'import androidx.core.content.ContextCompat;',
+    'import androidx.core.view.WindowCompat;',
+    'import androidx.core.view.WindowInsetsControllerCompat;',
     'import com.getcapacitor.BridgeActivity;',
     '',
     'public class MainActivity extends BridgeActivity {',
     '  @Override',
     '  public void onCreate(Bundle savedInstanceState) {',
     '    super.onCreate(savedInstanceState);',
+    '    try {',
+    '      Window window = getWindow();',
+    '      WindowCompat.setDecorFitsSystemWindows(window, true);',
+    '      window.setStatusBarColor(Color.parseColor("#F4F4F5"));',
+    '      window.setNavigationBarColor(Color.parseColor("#F4F4F5"));',
+    '      WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());',
+    '      if (controller != null) {',
+    '        controller.setAppearanceLightStatusBars(true);',
+    '        controller.setAppearanceLightNavigationBars(true);',
+    '      }',
+    '    } catch (Exception ignored) {}',
     '    if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {',
     '      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1001);',
     '    }',
@@ -57,21 +72,32 @@ if (fs.existsSync(javaMain)) {
     '',
   ].join('\n');
   fs.writeFileSync(javaMain, javaCode, 'utf8');
-  console.log('Patched MainActivity.java for runtime CAMERA permission prompt.');
+  console.log('Patched MainActivity.java for runtime CAMERA permission prompt and seamless fullscreen bars.');
 } else if (fs.existsSync(ktMain)) {
   const ktCode = [
     'package com.scangudang.wms',
     '',
     'import android.Manifest',
     'import android.content.pm.PackageManager',
+    'import android.graphics.Color',
     'import android.os.Bundle',
     'import androidx.core.app.ActivityCompat',
     'import androidx.core.content.ContextCompat',
+    'import androidx.core.view.WindowCompat',
     'import com.getcapacitor.BridgeActivity',
     '',
     'class MainActivity : BridgeActivity() {',
     '  override fun onCreate(savedInstanceState: Bundle?) {',
     '    super.onCreate(savedInstanceState)',
+    '    try {',
+    '      WindowCompat.setDecorFitsSystemWindows(window, true)',
+    '      window.statusBarColor = Color.parseColor("#F4F4F5")',
+    '      window.navigationBarColor = Color.parseColor("#F4F4F5")',
+    '      WindowCompat.getInsetsController(window, window.decorView)?.apply {',
+    '        isAppearanceLightStatusBars = true',
+    '        isAppearanceLightNavigationBars = true',
+    '      }',
+    '    } catch (_: Exception) {}',
     '    if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {',
     '      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1001)',
     '    }',
@@ -80,7 +106,8 @@ if (fs.existsSync(javaMain)) {
     '',
   ].join('\n');
   fs.writeFileSync(ktMain, ktCode, 'utf8');
-  console.log('Patched MainActivity.kt for runtime CAMERA permission prompt.');
+  console.log('Patched MainActivity.kt for runtime CAMERA permission prompt and seamless fullscreen bars.');
 } else {
   console.warn('Warning: MainActivity not found in android/app/src/main/java/com/scangudang/wms/');
 }
+

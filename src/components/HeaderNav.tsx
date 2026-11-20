@@ -67,30 +67,30 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
     warehouseLocations.find((w) => w.id === activeWarehouse) || warehouseLocations[0];
 
   return (
-    <header className="bg-[#f4f4f5] px-4 pt-3 pb-2 sticky top-0 z-30 select-none border-b border-zinc-200/50">
-      <div className="flex items-center justify-between gap-3">
-        {/* User Profile & Location Selector (Matches Screen 1 Mockup) */}
-        <div className="flex items-center gap-3">
+    <header className="bg-[#f4f4f5] px-3 sm:px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 sticky top-0 z-30 select-none border-b border-zinc-200/50 w-full">
+      <div className="flex items-center justify-between gap-2">
+        {/* User Profile & Location Selector */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Avatar with Status Ring */}
           <button
             type="button"
             onClick={onOpenAuthModal}
             title="Profil Pengguna / Ganti Operator"
-            className="relative cursor-pointer group"
+            className="relative cursor-pointer group shrink-0"
           >
             <img
               src={displayAvatar}
               alt={displayName}
-              className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:scale-105 transition-transform"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:scale-105 transition-transform"
             />
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#c8f53c] border-2 border-white rounded-full shadow-xs" />
           </button>
 
           {/* User Name & Warehouse City Dropdown */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <h1
               onClick={onOpenAuthModal}
-              className="text-base font-extrabold text-zinc-950 leading-tight cursor-pointer hover:text-zinc-700 transition-colors"
+              className="text-sm sm:text-base font-extrabold text-zinc-950 leading-tight cursor-pointer hover:text-zinc-700 transition-colors truncate"
             >
               {displayName}
             </h1>
@@ -98,11 +98,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             <button
               type="button"
               onClick={() => setShowLocationMenu(!showLocationMenu)}
-              className="flex items-center gap-1 text-xs text-zinc-500 font-medium hover:text-zinc-900 transition-colors mt-0.5 cursor-pointer"
+              className="flex items-center gap-1 text-xs text-zinc-500 font-medium hover:text-zinc-900 transition-colors mt-0.5 cursor-pointer max-w-full"
             >
-              <MapPin className="w-3.5 h-3.5 text-zinc-400" />
-              <span>{currentLocationMeta.city}</span>
-              <ChevronDown className="w-3 h-3 text-zinc-400 stroke-[2.5]" />
+              <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate">{currentLocationMeta.city}</span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 stroke-[2.5] shrink-0" />
             </button>
 
             {/* Warehouse Dropdown Popup */}

@@ -695,7 +695,7 @@ export default function App() {
       />
 
       {/* Main Tab Viewport */}
-      <main className="flex-1 p-3 pb-24 overflow-y-auto">
+      <main className="flex-1 w-full p-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] overflow-y-auto">
         {activeTab === 'scan_log' && (
           <ScanLogTab
             inventory={inventory}

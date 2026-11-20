@@ -76,8 +76,8 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-3 left-0 right-0 z-40 flex justify-center pointer-events-none px-2 sm:px-4">
-      {/* Floating Dark Pill Dock with Electric Lime Active Pill (Theme from Mockup) */}
+    <div className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-0 right-0 z-40 flex justify-center pointer-events-none px-2 sm:px-4">
+      {/* Floating Dark Pill Dock with Electric Lime Active Pill */}
       <nav className="pointer-events-auto bg-[#18181B] text-white rounded-full p-1.5 shadow-[0_20px_45px_rgba(0,0,0,0.55)] border border-zinc-800/90 flex items-center gap-1 max-w-full overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {
           const Icon = tab.icon;
