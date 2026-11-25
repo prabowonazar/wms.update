@@ -4,6 +4,7 @@ import {
   ScanLog,
   WarehouseLocation,
   WarehouseUser,
+  getItemMinStock,
 } from '../../types/warehouse';
 import { CameraBarcodeScanner } from '../CameraBarcodeScanner';
 import { IsometricPackageBox } from '../IsometricPackageBox';
@@ -65,14 +66,10 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
 
   // Form Catatan Scan
   const [scannedBarcode, setScannedBarcode] = useState('');
-  const [matchedItem, setMatchedItem] = useState<InventoryItem | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemSku, setItemSku] = useState('');
   const [binLocation, setBinLocation] = useState('A-01-01');
-  const [quantity, setQuantity] = useState<number>(1);
-  const [scanType, setScanType] = useState<ScanLog['type']>('gr');
   const [scanWarehouse, setScanWarehouse] = useState<WarehouseLocation>(activeWarehouse);
-  const [notes, setNotes] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Filters for Daftar Scan
@@ -86,23 +83,48 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
   // Handle barcode scanned from camera or test modal
   const handleBarcodeDecoded = (code: string) => {
     setScannedBarcode(code);
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setItemSku('');
+      setItemName('');
+      setBinLocation('A-01-01');
+      return;
+    }
+
     const found = inventory.find(
-      (item) => item.barcode === code || item.sku.toLowerCase() === code.toLowerCase()
+      (item) => item.barcode === trimmed || item.sku.toLowerCase() === trimmed.toLowerCase()
     );
 
     if (found) {
-      setMatchedItem(found);
       setItemSku(found.sku);
       setItemName(found.name);
       setBinLocation(found.defaultBin);
       soundService.playScanBeep();
     } else {
-      setMatchedItem(null);
-      setItemSku('SKU-' + code.slice(-4));
-      setItemName('Barang Baru (' + code + ')');
+      setItemSku('SKU-' + trimmed.slice(-4));
+      setItemName('Barang Baru (' + trimmed + ')');
+      setBinLocation('A-01-01');
       soundService.playScanBeep();
     }
   };
+
+  const matchedInventoryItem = inventory.find(
+    (item) =>
+      (scannedBarcode.trim() &&
+        (item.barcode === scannedBarcode.trim() ||
+          item.sku.toLowerCase() === scannedBarcode.trim().toLowerCase())) ||
+      (itemSku.trim() && item.sku.toLowerCase() === itemSku.trim().toLowerCase())
+  );
+  const currentBranchQty = matchedInventoryItem
+    ? matchedInventoryItem.stock[activeWarehouse] || 0
+    : null;
+  const currentBranchMinQty = matchedInventoryItem
+    ? getItemMinStock(matchedInventoryItem, activeWarehouse)
+    : null;
+  const isBelowMinQty =
+    currentBranchQty !== null &&
+    currentBranchMinQty !== null &&
+    currentBranchQty <= currentBranchMinQty;
 
   useEffect(() => {
     if (externalBarcodeToScan) {
@@ -127,10 +149,10 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
       barcode: scannedBarcode || 'MANUAL-' + Date.now().toString().slice(-6),
       sku: itemSku || 'UNKNOWN',
       name: itemName || 'Barang Tanpa Nama',
-      type: scanType,
+      type: 'general_scan',
       binLocation: binLocation || 'A-01-01',
-      quantity: Number(quantity) || 1,
-      notes: notes.trim() || 'Pemeriksaan barcode standar',
+      quantity: 1,
+      notes: 'Pemeriksaan barcode standar',
       operatorId: activeUser.id,
       operatorName: activeUser.name,
       warehouse: scanWarehouse,
@@ -146,11 +168,9 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
 
     // Reset Form for next scan
     setScannedBarcode('');
-    setMatchedItem(null);
     setItemName('');
     setItemSku('');
-    setNotes('');
-    setQuantity(1);
+    setBinLocation('A-01-01');
   };
 
   const getScanTypeLabel = (type: ScanLog['type']) => {
@@ -443,7 +463,7 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
               Form Hasil Scan Barcode
             </h3>
             <p className="text-[11px] text-zinc-500">
-              Verifikasi data rak & simpan transaksi scan
+              Verifikasi data barang & simpan ke riwayat scan
             </p>
           </div>
 
@@ -505,144 +525,35 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
             />
           </div>
 
-          {/* Tipe Transaksi (Pilihan: GR, DO, Opname, Mutasi Masuk, Mutasi Keluar) */}
-          <div>
-            <label className="text-[11px] font-bold text-zinc-700 block mb-1.5">
-              Tipe Transaksi Scan
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setScanType('gr')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'gr'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                GR (Good Receipt)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScanType('do')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'do'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                DO (Delivery Order)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScanType('opname')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'opname'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                Hitung Opname
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScanType('mutation_in')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'mutation_in'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                Mutasi Masuk
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScanType('mutation_out')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'mutation_out'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                Mutasi Keluar
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScanType('general_scan')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  scanType === 'general_scan'
-                    ? 'bg-[#18181B] text-[#C6F232] shadow-sm'
-                    : 'bg-[#F4F5F7] text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                Scan Bebas
-              </button>
-            </div>
-          </div>
-
-          {/* Qty & Lokasi Rak */}
+          {/* Qty & Min Qty dari Hasil Scan */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-bold text-zinc-700 block mb-1">
-                Jumlah (Qty)
+                Qty ({activeWarehouse.replace('Gudang ', '')})
               </label>
-              <div className="flex items-center bg-[#F4F5F7] border border-zinc-200 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="px-3.5 py-2 text-zinc-800 hover:bg-zinc-200 font-black text-sm cursor-pointer"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  className="w-full text-center bg-transparent font-bold text-xs focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="px-3.5 py-2 text-zinc-800 hover:bg-zinc-200 font-black text-sm cursor-pointer"
-                >
-                  +
-                </button>
+              <div
+                className={`w-full rounded-xl px-3 py-2 text-xs font-mono font-bold border ${
+                  isBelowMinQty
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-[#F4F5F7] border-zinc-200 text-zinc-900'
+                }`}
+              >
+                {currentBranchQty !== null
+                  ? `${currentBranchQty} ${matchedInventoryItem?.unit || ''}`.trim()
+                  : '-'}
               </div>
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-zinc-700 block mb-1">
-                Lokasi Rak / Bin
+                Min Qty
               </label>
-              <input
-                type="text"
-                value={binLocation}
-                onChange={(e) => setBinLocation(e.target.value)}
-                placeholder="A-01-01"
-                required
-                className="w-full bg-[#F4F5F7] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-900 focus:outline-none focus:border-zinc-900 uppercase"
-              />
+              <div className="w-full bg-[#F4F5F7] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-900">
+                {currentBranchMinQty !== null
+                  ? `${currentBranchMinQty} ${matchedInventoryItem?.unit || ''}`.trim()
+                  : '-'}
+              </div>
             </div>
-          </div>
-
-          {/* Catatan */}
-          <div>
-            <label className="text-[11px] font-bold text-zinc-700 block mb-1">
-              Catatan / No. Referensi
-            </label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Catatan tambahan hasil scan..."
-              className="w-full bg-[#F4F5F7] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
-            />
           </div>
 
           {/* Tombol Simpan (Electric Lime Action Button) */}
@@ -651,7 +562,7 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
             className="w-full py-3.5 bg-[#C6F232] hover:bg-[#B8E62B] active:scale-[0.99] text-zinc-950 font-extrabold text-sm rounded-2xl shadow-lg shadow-[#C6F232]/25 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
           >
             <Check className="w-4 h-4 stroke-[3]" />
-            <span>Simpan Transaksi ({getScanTypeLabel(scanType).split(' ')[0]})</span>
+            <span>Simpan Hasil Scan</span>
           </button>
 
           {saveSuccess && (
@@ -659,18 +570,10 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
               <CheckCircle2 className="w-4 h-4 text-[#C6F232] shrink-0" />
               <div>
                 <span className="font-bold text-[#C6F232] block">
-                  Transaksi Scan Berhasil Disimpan!
+                  Hasil Scan Berhasil Disimpan!
                 </span>
                 <span className="text-[11px] text-zinc-300">
-                  {scanType === 'gr'
-                    ? 'Stok bertambah & otomatis tercatat di Kartu Stok (Barang Masuk) serta antrean Spreadsheet.'
-                    : scanType === 'do'
-                    ? 'Stok berkurang & otomatis tercatat di Kartu Stok (Barang Keluar) serta antrean Spreadsheet.'
-                    : scanType === 'mutation_in'
-                    ? 'Stok bertambah & tercatat di Kartu Stok (Mutasi Masuk).'
-                    : scanType === 'mutation_out'
-                    ? 'Stok berkurang & tercatat di Kartu Stok (Mutasi Keluar).'
-                    : 'Hasil scan tercatat di riwayat transaksi.'}
+                  Data scan barang tercatat di riwayat scan log.
                 </span>
               </div>
             </div>

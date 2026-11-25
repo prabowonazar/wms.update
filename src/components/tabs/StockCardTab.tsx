@@ -31,6 +31,7 @@ interface StockCardTabProps {
   inventory: InventoryItem[];
   stockCards: StockCardEntry[];
   activeWarehouse: WarehouseLocation;
+  allowedWarehouses?: WarehouseLocation[];
   onChangeWarehouse: (wh: WarehouseLocation) => void;
   onAddManualMutation?: (mutation: {
     sku: string;
@@ -48,6 +49,7 @@ export const StockCardTab: React.FC<StockCardTabProps> = ({
   inventory,
   stockCards,
   activeWarehouse,
+  allowedWarehouses,
   onChangeWarehouse,
   onAddManualMutation,
 }) => {
@@ -289,10 +291,20 @@ export const StockCardTab: React.FC<StockCardTabProps> = ({
               onChange={(e) => onChangeWarehouse(e.target.value as WarehouseLocation)}
               className="bg-zinc-950 border border-zinc-700 text-xs font-bold text-amber-400 rounded-lg px-2.5 py-1 focus:outline-none"
             >
-              <option value="Gudang Pusat">Gudang Pusat</option>
-              <option value="Gudang Meruya">Gudang Meruya</option>
-              <option value="Gudang Denpasar">Gudang Denpasar</option>
-              <option value="Gudang Surabaya">Gudang Surabaya</option>
+              {(
+                [
+                  { id: 'Gudang Pusat', label: 'Gudang Jakarta (Pusat)' },
+                  { id: 'Gudang Meruya', label: 'Gudang Meruya' },
+                  { id: 'Gudang Denpasar', label: 'Gudang Bali (Denpasar)' },
+                  { id: 'Gudang Surabaya', label: 'Gudang Surabaya' },
+                ] as { id: WarehouseLocation; label: string }[]
+              )
+                .filter((w) => !allowedWarehouses || allowedWarehouses.includes(w.id))
+                .map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.label}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -811,11 +823,6 @@ export const StockCardTab: React.FC<StockCardTabProps> = ({
               <span className="font-mono font-bold text-red-700">
                 {selectedItemBranchMin} {selectedItem?.unit}
               </span>
-            </div>
-
-            {/* Per-branch min summary */}
-            <div className="text-[8px] text-zinc-500 font-mono mt-0.5 leading-tight">
-              Pst: {getItemMinStock(selectedItem, 'Gudang Pusat')} | Mry: {getItemMinStock(selectedItem, 'Gudang Meruya')}
             </div>
 
             <div className="text-[9px] font-bold leading-tight mt-0.5">

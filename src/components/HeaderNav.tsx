@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { WarehouseLocation, WarehouseUser } from '../types/warehouse';
+import {
+  WarehouseLocation,
+  WarehouseUser,
+  getAllowedWarehousesForUser,
+} from '../types/warehouse';
 import {
   MapPin,
   ChevronDown,
@@ -12,12 +16,16 @@ import {
   RotateCcw,
   Sparkles,
   ShieldAlert,
+  Cloud,
+  CloudOff,
+  Lock,
 } from 'lucide-react';
 
 interface HeaderNavProps {
   activeWarehouse: WarehouseLocation;
   onChangeWarehouse: (wh: WarehouseLocation) => void;
   activeUser: WarehouseUser | null;
+  allowedWarehouses?: WarehouseLocation[];
   onOpenAuthModal: () => void;
   onOpenBarcodeHelper: () => void;
   onOpenMobileConnect?: () => void;
@@ -29,12 +37,15 @@ interface HeaderNavProps {
   lowStockCount?: number;
   onOpenStockCard?: () => void;
   onOpenNotifications?: () => void;
+  cloudUserEmail?: string | null;
+  isCloudSyncing?: boolean;
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
   activeWarehouse,
   onChangeWarehouse,
   activeUser,
+  allowedWarehouses,
   onOpenAuthModal,
   onOpenBarcodeHelper,
   onOpenMobileConnect,
@@ -46,20 +57,26 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   lowStockCount = 0,
   onOpenStockCard,
   onOpenNotifications,
+  cloudUserEmail,
+  isCloudSyncing = false,
 }) => {
   const [showLocationMenu, setShowLocationMenu] = useState(false);
   const [showQuickSettings, setShowQuickSettings] = useState(false);
 
-  // Default display user fallback to active warehouse operator
-  const displayName = activeUser?.name || 'Nazar Prabowo';
+  const effectiveAllowed =
+    allowedWarehouses && allowedWarehouses.length > 0
+      ? allowedWarehouses
+      : getAllowedWarehousesForUser(activeUser);
+
+  const displayName = activeUser?.name || cloudUserEmail || 'Operator';
   const displayAvatar =
     activeUser?.avatar ||
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
 
   const warehouseLocations: { id: WarehouseLocation; label: string; city: string }[] = [
-    { id: 'Gudang Pusat', label: 'Gudang Pusat', city: 'Yogyakarta, Indonesia' },
-    { id: 'Gudang Meruya', label: 'Gudang Meruya', city: 'Jakarta Barat, DKI' },
-    { id: 'Gudang Denpasar', label: 'Gudang Denpasar', city: 'Denpasar, Bali' },
+    { id: 'Gudang Pusat', label: 'Gudang Jakarta (Pusat)', city: 'Jakarta (Gudang Pusat)' },
+    { id: 'Gudang Meruya', label: 'Gudang Meruya', city: 'Meruya, Jakarta Barat' },
+    { id: 'Gudang Denpasar', label: 'Gudang Bali (Denpasar)', city: 'Denpasar, Bali' },
     { id: 'Gudang Surabaya', label: 'Gudang Surabaya', city: 'Surabaya, Jawa Timur' },
   ];
 
@@ -75,7 +92,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           <button
             type="button"
             onClick={onOpenAuthModal}
-            title="Profil Pengguna / Ganti Operator"
+            title="Akun Aktif & Cloud Sync"
             className="relative cursor-pointer group shrink-0"
           >
             <img
@@ -107,28 +124,50 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
 
             {/* Warehouse Dropdown Popup */}
             {showLocationMenu && (
-              <div className="absolute left-0 top-full mt-2 w-56 bg-[#18181b] text-white rounded-2xl shadow-2xl p-2 z-50 border border-zinc-800 animate-in fade-in zoom-in-95 duration-150">
-                <span className="text-[10px] uppercase font-bold text-zinc-400 px-3 py-1 block">
-                  Pilih Lokasi Gudang
-                </span>
-                {warehouseLocations.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      onChangeWarehouse(item.id);
-                      setShowLocationMenu(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                      activeWarehouse === item.id
-                        ? 'bg-[#c8f53c] text-black font-bold'
-                        : 'text-zinc-300 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    <span className="text-[10px] opacity-75 font-normal">{item.city.split(',')[0]}</span>
-                  </button>
-                ))}
+              <div className="absolute left-0 top-full mt-2 w-64 bg-[#18181b] text-white rounded-2xl shadow-2xl p-2 z-50 border border-zinc-800 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3 py-1 flex items-center justify-between gap-1">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400">
+                    Pilih Lokasi Gudang
+                  </span>
+                  <span className="text-[9px] font-bold text-amber-400">
+                    {effectiveAllowed.length > 1 ? 'Semua Gudang' : 'Terkunci'}
+                  </span>
+                </div>
+                {warehouseLocations.map((item) => {
+                  const isAllowed = effectiveAllowed.includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={!isAllowed}
+                      title={
+                        isAllowed
+                          ? item.label
+                          : `Terkunci — Akun Anda tidak memiliki akses ke ${item.label}`
+                      }
+                      onClick={() => {
+                        if (!isAllowed) return;
+                        onChangeWarehouse(item.id);
+                        setShowLocationMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
+                        !isAllowed
+                          ? 'text-zinc-600 cursor-not-allowed opacity-60'
+                          : activeWarehouse === item.id
+                          ? 'bg-[#c8f53c] text-black font-bold cursor-pointer'
+                          : 'text-zinc-300 hover:bg-zinc-800 cursor-pointer'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        {!isAllowed && <Lock className="w-3 h-3 shrink-0 text-zinc-500" />}
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      <span className="text-[10px] opacity-75 font-normal shrink-0">
+                        {item.city.split(',')[0]}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -169,6 +208,28 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           >
             <Bell className="w-4 h-4 stroke-[2]" />
             <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#c8f53c] ring-2 ring-white shadow-xs" />
+          </button>
+
+          {/* Cloud Sync Quick Trigger */}
+          <button
+            type="button"
+            onClick={onOpenAuthModal}
+            title={
+              cloudUserEmail
+                ? `Cloud Sync Aktif (${cloudUserEmail})`
+                : 'Aktifkan Cloud Sync (Login Email & Password)'
+            }
+            className={`w-9 h-9 rounded-full border flex items-center justify-center shadow-xs transition-colors cursor-pointer ${
+              cloudUserEmail
+                ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'
+                : 'bg-white hover:bg-zinc-100 border-zinc-200/80 text-zinc-500'
+            }`}
+          >
+            {cloudUserEmail ? (
+              <Cloud className={`w-4 h-4 stroke-[2.2] ${isCloudSyncing ? 'animate-pulse' : ''}`} />
+            ) : (
+              <CloudOff className="w-4 h-4 stroke-[2]" />
+            )}
           </button>
 
           {/* Try on Mobile Phone Button */}

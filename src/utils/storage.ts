@@ -59,20 +59,38 @@ export class StorageService {
     }
   }
 
-  // Users
+  // Users / Operators
   static getUsers(): WarehouseUser[] {
+    const USERS_REV_KEY = 'scangudang_users_rev';
+    const CURRENT_USERS_REV = 'rev_20261124_branch_rules_v3';
+    const currentRev = typeof window !== 'undefined' ? localStorage.getItem(USERS_REV_KEY) : null;
+
+    if (currentRev !== CURRENT_USERS_REV) {
+      this.setItem(KEYS.USERS, INITIAL_USERS);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(USERS_REV_KEY, CURRENT_USERS_REV);
+      }
+      return INITIAL_USERS;
+    }
+
     const users = this.getItem<WarehouseUser[]>(KEYS.USERS, INITIAL_USERS);
-    return users.map((u) => (u.name === 'Budi Santoso' ? { ...u, name: 'Nazar Prabowo' } : u));
+    if (!users || users.length === 0) return INITIAL_USERS;
+    return users;
+  }
+
+  static saveUsers(users: WarehouseUser[]): void {
+    this.setItem(KEYS.USERS, users);
   }
 
   static getActiveUser(): WarehouseUser {
-    const user = this.getItem<WarehouseUser>(KEYS.ACTIVE_USER, INITIAL_USERS[0]);
-    if (user && user.name === 'Budi Santoso') {
-      const updated = { ...user, name: 'Nazar Prabowo' };
-      this.setItem(KEYS.ACTIVE_USER, updated);
-      return updated;
+    const users = this.getUsers();
+    const stored = this.getItem<WarehouseUser | null>(KEYS.ACTIVE_USER, null);
+    if (stored) {
+      const matched = users.find((u) => u.id === stored.id || u.name === stored.name);
+      if (matched) return matched;
     }
-    return user;
+    this.setItem(KEYS.ACTIVE_USER, users[0]);
+    return users[0];
   }
 
   static setActiveUser(user: WarehouseUser): void {

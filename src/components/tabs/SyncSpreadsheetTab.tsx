@@ -37,6 +37,8 @@ import {
   CheckCheck,
   Clipboard,
   Upload,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import { soundService } from '../../utils/audio';
 import {
@@ -59,6 +61,8 @@ interface SyncSpreadsheetTabProps {
   inventory?: InventoryItem[];
   scanLogs?: ScanLog[];
   stockCards?: StockCardEntry[];
+  cloudUserEmail?: string | null;
+  onOpenCloudLogin?: () => void;
 }
 
 export const SyncSpreadsheetTab: React.FC<SyncSpreadsheetTabProps> = ({
@@ -69,11 +73,20 @@ export const SyncSpreadsheetTab: React.FC<SyncSpreadsheetTabProps> = ({
   inventory = [],
   scanLogs = [],
   stockCards = [],
+  cloudUserEmail,
+  onOpenCloudLogin,
 }) => {
   const [spreadsheetUrl, setSpreadsheetUrl] = useState(config.spreadsheetUrl || '');
   const [webhookUrl, setWebhookUrl] = useState(config.webhookUrl || '');
   const [activeSheetName, setActiveSheetName] = useState(config.activeSheetName || 'Log_Transaksi');
   const [autoSync, setAutoSync] = useState(config.autoSync);
+
+  React.useEffect(() => {
+    setSpreadsheetUrl(config.spreadsheetUrl || '');
+    setWebhookUrl(config.webhookUrl || '');
+    setActiveSheetName(config.activeSheetName || 'Log_Transaksi');
+    setAutoSync(config.autoSync);
+  }, [config.spreadsheetUrl, config.webhookUrl, config.activeSheetName, config.autoSync]);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isPushing, setIsPushing] = useState(false);
@@ -655,6 +668,44 @@ export const SyncSpreadsheetTab: React.FC<SyncSpreadsheetTabProps> = ({
                 Hubungkan aplikasi mobile dengan URL Google Sheets atau Google Apps Script Webhook
               </p>
             </div>
+          </div>
+
+          {/* Cloud Backup Status for Spreadsheet URL & Warehouse Data */}
+          <div
+            className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+              cloudUserEmail
+                ? 'bg-emerald-950/35 border-emerald-500/35 text-emerald-200'
+                : 'bg-zinc-950 border-zinc-800 text-zinc-300'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {cloudUserEmail ? (
+                <Cloud className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <CloudOff className="w-4 h-4 text-zinc-400 shrink-0" />
+              )}
+              <div className="min-w-0 text-[11px]">
+                <div className="font-bold text-white truncate">
+                  {cloudUserEmail
+                    ? `Cloud Storage Aktif (${cloudUserEmail})`
+                    : 'Pengaturan Spreadsheet Belum Disinkron ke Cloud'}
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  {cloudUserEmail
+                    ? 'URL Spreadsheet, Webhook & semua data transaksi tersimpan aman antar perangkat.'
+                    : 'Login dengan Email & Password agar URL Spreadsheet & data gudang tersimpan ke Firebase.'}
+                </div>
+              </div>
+            </div>
+            {!cloudUserEmail && onOpenCloudLogin && (
+              <button
+                type="button"
+                onClick={onOpenCloudLogin}
+                className="px-3 py-1.5 bg-[#C6F232] hover:bg-[#d5f855] text-zinc-950 rounded-lg text-[11px] font-extrabold shrink-0 cursor-pointer"
+              >
+                Login Cloud
+              </button>
+            )}
           </div>
 
           {/* Panduan 4 Langkah Singkat dengan Ilustrasi Visual Menu */}

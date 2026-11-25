@@ -26,8 +26,8 @@ interface LiveTrackingMapViewProps {
 export const LiveTrackingMapView: React.FC<LiveTrackingMapViewProps> = ({
   onBack,
   trackingNumber = '#TKP01-EUFD24C',
-  activeWarehouse = 'Gudang Pusat, Yogyakarta',
-  destination = 'Condong Catur, Yogyakarta',
+  activeWarehouse = 'Gudang Jakarta (Pusat)',
+  destination = 'Meruya, Jakarta Barat',
   onCallDriver,
 }) => {
   const [activeSegment, setActiveSegment] = useState<'tracking' | 'shipping'>('tracking');

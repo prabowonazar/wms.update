@@ -4,6 +4,39 @@ export type WarehouseLocation =
   | 'Gudang Denpasar'
   | 'Gudang Surabaya';
 
+export const ALL_WAREHOUSES: WarehouseLocation[] = [
+  'Gudang Pusat',
+  'Gudang Meruya',
+  'Gudang Denpasar',
+  'Gudang Surabaya',
+];
+
+export const WAREHOUSE_META: Record<
+  WarehouseLocation,
+  { label: string; shortLabel: string; city: string }
+> = {
+  'Gudang Pusat': {
+    label: 'Gudang Jakarta (Pusat)',
+    shortLabel: 'Gudang Jakarta',
+    city: 'Jakarta (Gudang Pusat)',
+  },
+  'Gudang Meruya': {
+    label: 'Gudang Meruya',
+    shortLabel: 'Gudang Meruya',
+    city: 'Meruya, Jakarta Barat',
+  },
+  'Gudang Denpasar': {
+    label: 'Gudang Bali (Denpasar)',
+    shortLabel: 'Gudang Bali',
+    city: 'Denpasar, Bali',
+  },
+  'Gudang Surabaya': {
+    label: 'Gudang Surabaya',
+    shortLabel: 'Gudang Surabaya',
+    city: 'Surabaya, Jawa Timur',
+  },
+};
+
 export type UserRole = 'operator' | 'admin' | 'supervisor';
 
 export interface WarehouseUser {
@@ -14,6 +47,24 @@ export interface WarehouseUser {
   pin: string;
   avatar: string;
   phone: string;
+  assignedWarehouse?: WarehouseLocation;
+  warehouseLabel?: string;
+  allowedWarehouses?: WarehouseLocation[];
+}
+
+export function getAllowedWarehousesForUser(user?: WarehouseUser | null): WarehouseLocation[] {
+  if (!user) return ['Gudang Pusat'];
+  if (user.allowedWarehouses && user.allowedWarehouses.length > 0) {
+    return user.allowedWarehouses;
+  }
+  const lower = user.name.toLowerCase();
+  if (user.id === 'op-nazar' || lower.includes('nazar') || user.role === 'supervisor' || user.role === 'admin') {
+    return ALL_WAREHOUSES;
+  }
+  if (user.assignedWarehouse) {
+    return [user.assignedWarehouse];
+  }
+  return ['Gudang Pusat'];
 }
 
 export interface InventoryItem {
@@ -131,7 +182,7 @@ export interface OutboundOrder {
   dispatchedAt?: string;
   purpose: 'Penjualan' | 'Transfer Cabang' | 'Retur Supplier' | 'Pemakaian Internal';
   driverName: string;
-  vehicleNumber: string;
+  vehicleNumber?: string;
   items: OutboundItem[];
   pickerOperator: string;
   notes: string;

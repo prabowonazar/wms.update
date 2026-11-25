@@ -475,7 +475,7 @@ export const BarcodeHelperModal: React.FC<BarcodeHelperModalProps> = ({
                           <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[9px] font-mono text-zinc-400 bg-zinc-900/60 px-2 py-0.5 rounded-md border border-zinc-800">
                             <span className="text-zinc-500 font-bold">Min Stok:</span>
                             <span className={activeWarehouse === 'Gudang Pusat' ? 'text-[#C6F232] font-bold' : 'text-zinc-300'}>
-                              Pusat: {getItemMinStock(item, 'Gudang Pusat')}
+                              Jakarta: {getItemMinStock(item, 'Gudang Pusat')}
                             </span>
                             <span className="text-zinc-700">·</span>
                             <span className={activeWarehouse === 'Gudang Meruya' ? 'text-[#C6F232] font-bold' : 'text-zinc-300'}>
@@ -683,7 +683,7 @@ export const BarcodeHelperModal: React.FC<BarcodeHelperModalProps> = ({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
-                    <label className="text-[10px] text-zinc-400 block mb-0.5">Min Gudang Pusat</label>
+                    <label className="text-[10px] text-zinc-400 block mb-0.5">Min Jakarta (Pusat)</label>
                     <input
                       type="number"
                       min="0"

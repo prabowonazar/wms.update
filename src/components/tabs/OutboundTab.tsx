@@ -64,7 +64,6 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
   const [newCustomer, setNewCustomer] = useState('');
   const [newPurpose, setNewPurpose] = useState<OutboundOrder['purpose']>('Penjualan');
   const [newDriver, setNewDriver] = useState('');
-  const [newVehicle, setNewVehicle] = useState('');
   const [newNotes, setNewNotes] = useState('');
 
   // Handle barcode scanned during outbound
@@ -189,7 +188,6 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
       status: 'picking',
       purpose: newPurpose,
       driverName: newDriver.trim() || 'Driver Internal',
-      vehicleNumber: newVehicle.trim() || 'B 1234 WMS',
       pickerOperator: activeUser.name,
       notes: newNotes.trim() || 'Pengeluaran barang standar',
       items: inventory.slice(2, 5).map((item) => ({
@@ -209,7 +207,6 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
     setNewDestination('');
     setNewCustomer('');
     setNewDriver('');
-    setNewVehicle('');
     setNewNotes('');
     soundService.playSuccessChime();
   };
@@ -312,31 +309,17 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-bold text-zinc-700 block mb-1">
-                  Nama Driver / Ekspedisi
-                </label>
-                <input
-                  type="text"
-                  value={newDriver}
-                  onChange={(e) => setNewDriver(e.target.value)}
-                  placeholder="J&T Cargo / Pak Dedi"
-                  className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-zinc-700 block mb-1">
-                  Nomor Polisi Kendaraan
-                </label>
-                <input
-                  type="text"
-                  value={newVehicle}
-                  onChange={(e) => setNewVehicle(e.target.value)}
-                  placeholder="B 9821 TZX"
-                  className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
-                />
-              </div>
+            <div>
+              <label className="text-[11px] font-bold text-zinc-700 block mb-1">
+                Nama Driver / Ekspedisi
+              </label>
+              <input
+                type="text"
+                value={newDriver}
+                onChange={(e) => setNewDriver(e.target.value)}
+                placeholder="J&T Cargo / Pak Dedi"
+                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900"
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -418,11 +401,9 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
                   <span className="text-amber-700 font-mono font-bold">{activeOrder.purpose}</span>
                 </p>
                 <p className="text-[11px] text-zinc-600">
-                  Armada:{' '}
-                  <span className="text-zinc-900 font-mono font-semibold">
-                    {activeOrder.vehicleNumber}
-                  </span>{' '}
-                  ({activeOrder.driverName}) · Picker:{' '}
+                  Driver / Ekspedisi:{' '}
+                  <span className="text-zinc-900 font-semibold">{activeOrder.driverName}</span> ·{' '}
+                  Picker:{' '}
                   <span className="text-zinc-900 font-semibold">{activeOrder.pickerOperator}</span>
                 </p>
                 {activeOrder.notes && (

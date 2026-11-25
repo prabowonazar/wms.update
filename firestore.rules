@@ -1,0 +1,867 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidWarehouse(wh) {
+      return wh is string && wh in ['Gudang Pusat', 'Gudang Meruya', 'Gudang Denpasar', 'Gudang Surabaya'];
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'rfq.fascosanwira@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // Branch & Operator Role Access Control
+    // Nazar: Semua Gudang
+    // Atang & Husein: Hanya Gudang Jakarta ('Gudang Pusat')
+    // Burhan: Hanya Gudang Meruya ('Gudang Meruya')
+    // Krisna: Hanya Gudang Bali ('Gudang Denpasar')
+    // Ajeng: Hanya Gudang Surabaya ('Gudang Surabaya')
+    // -------------------------------------------------------------------------
+    function emailLower() {
+      return (isSignedIn() && request.auth.token.email is string)
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    function isAtangEmail() {
+      return emailLower().matches('.*atang.*');
+    }
+
+    function isHuseinEmail() {
+      return emailLower().matches('.*husein.*');
+    }
+
+    function isJakartaOperatorEmail() {
+      return isAtangEmail() || isHuseinEmail();
+    }
+
+    function isBurhanEmail() {
+      return !isHuseinEmail() && emailLower().matches('.*burhan.*');
+    }
+
+    function isKrisnaEmail() {
+      return emailLower().matches('.*krisna.*');
+    }
+
+    function isAjengEmail() {
+      return emailLower().matches('.*ajeng.*');
+    }
+
+    function isNazarEmail() {
+      return emailLower().matches('.*nazar.*');
+    }
+
+    function hasBranchLockedEmail() {
+      return isJakartaOperatorEmail() || isBurhanEmail() || isKrisnaEmail() || isAjengEmail();
+    }
+
+    function expectedLockedOperatorId() {
+      return isAtangEmail()
+        ? 'op-atang'
+        : (isHuseinEmail()
+          ? 'op-husein'
+          : (isBurhanEmail()
+            ? 'op-burhan'
+            : (isKrisnaEmail()
+              ? 'op-krisna'
+              : (isAjengEmail() ? 'op-ajeng' : ''))));
+    }
+
+    function emailAllowsWarehouse(wh) {
+      return (
+        (isJakartaOperatorEmail() && wh == 'Gudang Pusat') ||
+        (isBurhanEmail() && wh == 'Gudang Meruya') ||
+        (isKrisnaEmail() && wh == 'Gudang Denpasar') ||
+        (isAjengEmail() && wh == 'Gudang Surabaya')
+      );
+    }
+
+    function workspaceOperatorId(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && ('activeOperatorId' in get(/databases/$(database)/documents/users/$(userId)).data)
+        ? get(/databases/$(database)/documents/users/$(userId)).data.activeOperatorId
+        : '';
+    }
+
+    function operatorIdAllowsWarehouse(opId, wh) {
+      return (
+        opId == 'op-nazar' ||
+        ((opId == 'op-atang' || opId == 'op-husein') && wh == 'Gudang Pusat') ||
+        (opId == 'op-burhan' && wh == 'Gudang Meruya') ||
+        (opId == 'op-krisna' && wh == 'Gudang Denpasar') ||
+        (opId == 'op-ajeng' && wh == 'Gudang Surabaya')
+      );
+    }
+
+    function canAccessAllWarehouses(userId) {
+      return isAdmin() || (
+        !hasBranchLockedEmail() && (
+          isNazarEmail() ||
+          workspaceOperatorId(userId) == 'op-nazar'
+        )
+      );
+    }
+
+    function canAccessWarehouse(userId, wh) {
+      return isValidWarehouse(wh) && (
+        isAdmin() ||
+        (hasBranchLockedEmail() && emailAllowsWarehouse(wh)) ||
+        (!hasBranchLockedEmail() && (
+          isNazarEmail() ||
+          operatorIdAllowsWarehouse(workspaceOperatorId(userId), wh)
+        ))
+      );
+    }
+
+    function isValidWorkspaceForCaller(data) {
+      return isAdmin() || (
+        hasBranchLockedEmail()
+          ? (
+            emailAllowsWarehouse(data.activeWarehouse)
+            && ('activeOperatorId' in data)
+            && data.activeOperatorId == expectedLockedOperatorId()
+          )
+          : (
+            !('activeOperatorId' in data)
+            || data.activeOperatorId == ''
+            || operatorIdAllowsWarehouse(data.activeOperatorId, data.activeWarehouse)
+          )
+      );
+    }
+
+    function invFieldUnchanged(fieldName) {
+      return (!(fieldName in incoming()) && !(fieldName in existing()))
+        || ((fieldName in incoming()) && (fieldName in existing()) && incoming()[fieldName] == existing()[fieldName]);
+    }
+
+    function canModifyInventoryStocks(userId) {
+      return canAccessAllWarehouses(userId) || (
+        (incoming().stockPusat == existing().stockPusat || canAccessWarehouse(userId, 'Gudang Pusat'))
+        && (incoming().stockMeruya == existing().stockMeruya || canAccessWarehouse(userId, 'Gudang Meruya'))
+        && (incoming().stockDenpasar == existing().stockDenpasar || canAccessWarehouse(userId, 'Gudang Denpasar'))
+        && (incoming().stockSurabaya == existing().stockSurabaya || canAccessWarehouse(userId, 'Gudang Surabaya'))
+        && (invFieldUnchanged('minPusat') || canAccessWarehouse(userId, 'Gudang Pusat'))
+        && (invFieldUnchanged('minMeruya') || canAccessWarehouse(userId, 'Gudang Meruya'))
+        && (invFieldUnchanged('minDenpasar') || canAccessWarehouse(userId, 'Gudang Denpasar'))
+        && (invFieldUnchanged('minSurabaya') || canAccessWarehouse(userId, 'Gudang Surabaya'))
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints (Anti-Update-Gap)
+    // -------------------------------------------------------------------------
+    function isValidUserWorkspace(data, userId) {
+      return data.keys().hasAll(['ownerId', 'displayName', 'activeWarehouse', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'displayName', 'activeWarehouse', 'activeOperatorId', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && isValidWarehouse(data.activeWarehouse)
+        && (!('activeOperatorId' in data) || (data.activeOperatorId is string && data.activeOperatorId.size() <= 64))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWarehouseOperator(data, userId) {
+      return data.keys().hasAll(['ownerId', 'id', 'nik', 'name', 'role', 'assignedWarehouse', 'warehouseLabel', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'id', 'nik', 'name', 'role', 'assignedWarehouse', 'warehouseLabel', 'allowedWarehouses', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.nik is string && data.nik.size() >= 1 && data.nik.size() <= 32
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.role in ['operator', 'admin', 'supervisor']
+        && isValidWarehouse(data.assignedWarehouse)
+        && data.warehouseLabel is string && data.warehouseLabel.size() <= 64
+        && (!('allowedWarehouses' in data) || (
+          data.allowedWarehouses is list
+          && data.allowedWarehouses.size() >= 1
+          && data.allowedWarehouses.size() <= 4
+          && isValidWarehouse(data.allowedWarehouses[0])
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateProfile(data, userId) {
+      return data.keys().hasAll(['ownerId', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'email', 'photoURL', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInventoryItem(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'sku', 'barcode', 'name', 'category', 'unit', 'defaultBin',
+          'stockPusat', 'stockMeruya', 'stockDenpasar', 'stockSurabaya',
+          'minStock', 'isDeleted', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'sku', 'barcode', 'name', 'category', 'unit', 'defaultBin',
+          'costPrice', 'stockPusat', 'stockMeruya', 'stockDenpasar', 'stockSurabaya',
+          'minStock', 'minPusat', 'minMeruya', 'minDenpasar', 'minSurabaya',
+          'isDeleted', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 80
+        && data.barcode is string && data.barcode.size() >= 1 && data.barcode.size() <= 100
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.category is string && data.category.size() <= 100
+        && data.unit is string && data.unit.size() <= 32
+        && data.defaultBin is string && data.defaultBin.size() <= 64
+        && (!('costPrice' in data) || data.costPrice is number)
+        && data.stockPusat is number
+        && data.stockMeruya is number
+        && data.stockDenpasar is number
+        && data.stockSurabaya is number
+        && data.minStock is number
+        && (!('minPusat' in data) || data.minPusat is number)
+        && (!('minMeruya' in data) || data.minMeruya is number)
+        && (!('minDenpasar' in data) || data.minDenpasar is number)
+        && (!('minSurabaya' in data) || data.minSurabaya is number)
+        && data.isDeleted is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidScanLog(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'timestamp', 'barcode', 'sku', 'name', 'type',
+          'binLocation', 'quantity', 'notes', 'operatorId', 'operatorName',
+          'warehouse', 'syncedToSheet', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'timestamp', 'barcode', 'sku', 'name', 'type',
+          'binLocation', 'lotNumber', 'quantity', 'notes', 'operatorId', 'operatorName',
+          'warehouse', 'referenceNo', 'syncedToSheet', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.timestamp is string && data.timestamp.size() <= 40
+        && data.barcode is string && data.barcode.size() <= 100
+        && data.sku is string && data.sku.size() <= 80
+        && data.name is string && data.name.size() <= 200
+        && data.type in ['general_scan', 'gr', 'do', 'opname', 'mutation_in', 'mutation_out', 'inbound', 'outbound', 'relocation']
+        && data.binLocation is string && data.binLocation.size() <= 64
+        && (!('lotNumber' in data) || (data.lotNumber is string && data.lotNumber.size() <= 64))
+        && data.quantity is number && data.quantity >= 0
+        && data.notes is string && data.notes.size() <= 500
+        && data.operatorId is string && data.operatorId.size() <= 64
+        && data.operatorName is string && data.operatorName.size() <= 100
+        && isValidWarehouse(data.warehouse)
+        && (!('referenceNo' in data) || (data.referenceNo is string && data.referenceNo.size() <= 100))
+        && data.syncedToSheet is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOpnameSession(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'code', 'title', 'warehouse', 'targetBinZone',
+          'status', 'createdAtStr', 'operatorName', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'code', 'title', 'warehouse', 'targetBinZone',
+          'status', 'createdAtStr', 'completedAtStr', 'operatorName', 'approvedBy',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.code is string && data.code.size() <= 64
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && isValidWarehouse(data.warehouse)
+        && data.targetBinZone is string && data.targetBinZone.size() <= 120
+        && data.status in ['active', 'completed', 'cancelled']
+        && data.createdAtStr is string && data.createdAtStr.size() <= 40
+        && (!('completedAtStr' in data) || (data.completedAtStr is string && data.completedAtStr.size() <= 40))
+        && data.operatorName is string && data.operatorName.size() <= 100
+        && (!('approvedBy' in data) || (data.approvedBy is string && data.approvedBy.size() <= 100))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOpnameCount(data, userId, sessionId) {
+      return data.keys().hasAll([
+          'ownerId', 'sessionId', 'sku', 'barcode', 'name', 'binLocation',
+          'systemStock', 'physicalCount', 'difference', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'sessionId', 'sku', 'barcode', 'name', 'binLocation',
+          'systemStock', 'physicalCount', 'difference', 'costPrice', 'lastScannedAt',
+          'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.sessionId)
+        && data.sessionId == sessionId
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 80
+        && data.barcode is string && data.barcode.size() <= 100
+        && data.name is string && data.name.size() <= 200
+        && data.binLocation is string && data.binLocation.size() <= 64
+        && data.systemStock is number
+        && data.physicalCount is number && data.physicalCount >= 0
+        && data.difference is number
+        && (!('costPrice' in data) || data.costPrice is number)
+        && (!('lastScannedAt' in data) || (data.lastScannedAt is string && data.lastScannedAt.size() <= 40))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInboundOrder(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'poNumber', 'supplier', 'orderDate', 'warehouse',
+          'status', 'items', 'suratJalanNumber', 'receiverOperator', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'poNumber', 'supplier', 'orderDate', 'warehouse',
+          'status', 'receivedAt', 'items', 'suratJalanNumber', 'receiverOperator',
+          'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.poNumber is string && data.poNumber.size() <= 80
+        && data.supplier is string && data.supplier.size() <= 160
+        && data.orderDate is string && data.orderDate.size() <= 40
+        && isValidWarehouse(data.warehouse)
+        && data.status in ['draft', 'receiving', 'completed']
+        && (!('receivedAt' in data) || (data.receivedAt is string && data.receivedAt.size() <= 40))
+        && data.suratJalanNumber is string && data.suratJalanNumber.size() <= 80
+        && data.receiverOperator is string && data.receiverOperator.size() <= 100
+        && data.notes is string && data.notes.size() <= 500
+        && data.items is list && data.items.size() <= 100
+        && (data.items.size() == 0 || (
+          data.items[0] is map
+          && data.items[0].sku is string && data.items[0].sku.size() <= 80
+          && data.items[0].orderedQty is number
+          && data.items[0].receivedQty is number
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOutboundOrder(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'doNumber', 'destination', 'customerName', 'orderDate',
+          'warehouse', 'status', 'purpose', 'driverName', 'vehicleNumber', 'items',
+          'pickerOperator', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'doNumber', 'destination', 'customerName', 'orderDate',
+          'warehouse', 'status', 'dispatchedAt', 'purpose', 'driverName', 'vehicleNumber',
+          'items', 'pickerOperator', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.doNumber is string && data.doNumber.size() <= 80
+        && data.destination is string && data.destination.size() <= 160
+        && data.customerName is string && data.customerName.size() <= 160
+        && data.orderDate is string && data.orderDate.size() <= 40
+        && isValidWarehouse(data.warehouse)
+        && data.status in ['draft', 'picking', 'dispatched']
+        && (!('dispatchedAt' in data) || (data.dispatchedAt is string && data.dispatchedAt.size() <= 40))
+        && data.purpose in ['Penjualan', 'Transfer Cabang', 'Retur Supplier', 'Pemakaian Internal']
+        && data.driverName is string && data.driverName.size() <= 120
+        && data.vehicleNumber is string && data.vehicleNumber.size() <= 40
+        && data.pickerOperator is string && data.pickerOperator.size() <= 100
+        && data.notes is string && data.notes.size() <= 500
+        && data.items is list && data.items.size() <= 100
+        && (data.items.size() == 0 || (
+          data.items[0] is map
+          && data.items[0].sku is string && data.items[0].sku.size() <= 80
+          && data.items[0].requestedQty is number
+          && data.items[0].pickedQty is number
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStockCard(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'date', 'sku', 'name', 'warehouse', 'referenceNo',
+          'transactionType', 'qtyIn', 'qtyOut', 'balanceAfter', 'operator',
+          'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'date', 'sku', 'name', 'warehouse', 'referenceNo',
+          'transactionType', 'qtyIn', 'qtyOut', 'balanceAfter', 'operator',
+          'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.date is string && data.date.size() <= 40
+        && data.sku is string && data.sku.size() <= 80
+        && data.name is string && data.name.size() <= 200
+        && isValidWarehouse(data.warehouse)
+        && data.referenceNo is string && data.referenceNo.size() <= 100
+        && data.transactionType in ['GR', 'DO', 'OPNAME_RECONSEL', 'MUTASI_MASUK', 'MUTASI_KELUAR', 'INBOUND', 'OUTBOUND', 'OPNAME_ADJUSTMENT', 'RELOCATION']
+        && data.qtyIn is number && data.qtyIn >= 0
+        && data.qtyOut is number && data.qtyOut >= 0
+        && data.balanceAfter is number
+        && data.operator is string && data.operator.size() <= 100
+        && data.notes is string && data.notes.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSpreadsheetSettings(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'spreadsheetUrl', 'sheetId', 'activeSheetName',
+          'autoSync', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'spreadsheetUrl', 'webhookUrl', 'sheetId', 'activeSheetName',
+          'autoSync', 'lastSyncTime', 'status', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.spreadsheetUrl is string && data.spreadsheetUrl.size() <= 500
+        && (!('webhookUrl' in data) || (data.webhookUrl is string && data.webhookUrl.size() <= 500))
+        && data.sheetId is string && data.sheetId.size() <= 160
+        && data.activeSheetName is string && data.activeSheetName.size() <= 120
+        && data.autoSync is bool
+        && (!('lastSyncTime' in data) || (data.lastSyncTime is string && data.lastSyncTime.size() <= 40))
+        && data.status in ['connected', 'disconnected', 'syncing', 'error']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSyncQueueItem(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'id', 'type', 'referenceNo', 'sku', 'name', 'quantity',
+          'warehouse', 'operator', 'timestamp', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'type', 'barcode', 'binLocation', 'referenceNo',
+          'sku', 'name', 'quantity', 'warehouse', 'operator', 'timestamp',
+          'status', 'errorMessage', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && data.type is string && data.type.size() <= 40
+        && (!('barcode' in data) || (data.barcode is string && data.barcode.size() <= 100))
+        && (!('binLocation' in data) || (data.binLocation is string && data.binLocation.size() <= 64))
+        && data.referenceNo is string && data.referenceNo.size() <= 100
+        && data.sku is string && data.sku.size() <= 80
+        && data.name is string && data.name.size() <= 200
+        && data.quantity is number
+        && data.warehouse is string && data.warehouse.size() <= 64
+        && data.operator is string && data.operator.size() <= 100
+        && data.timestamp is string && data.timestamp.size() <= 40
+        && data.status in ['pending', 'synced', 'failed']
+        && (!('errorMessage' in data) || (data.errorMessage is string && data.errorMessage.size() <= 300))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAccurateRecord(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'sku', 'name', 'category', 'unit', 'accurateBookQty',
+          'costPerUnit', 'lastUpdated', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'sku', 'name', 'category', 'unit', 'accurateBookQty',
+          'costPerUnit', 'lastUpdated', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 80
+        && data.name is string && data.name.size() <= 200
+        && data.category is string && data.category.size() <= 100
+        && data.unit is string && data.unit.size() <= 32
+        && data.accurateBookQty is number
+        && data.costPerUnit is number
+        && data.lastUpdated is string && data.lastUpdated.size() <= 40
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Admins Collection (Read-Only Self Verification)
+    // -------------------------------------------------------------------------
+    match /admins/{adminId} {
+      allow get: if isVerified() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // User Workspace & Warehouse Subcollections
+    // -------------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwnerOrAdmin(userId);
+      allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserWorkspace(incoming(), userId)
+        && isValidWorkspaceForCaller(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwnerOrAdmin(userId)
+        && isValidUserWorkspace(incoming(), userId)
+        && isValidWorkspaceForCaller(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'activeWarehouse', 'activeOperatorId', 'updatedAt']);
+      allow delete: if false;
+
+      // Isolated PII Subcollection
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && docId == 'profile' && isOwnerOrAdmin(userId);
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(docId) && docId == 'profile'
+          && isOwner(userId)
+          && isValidPrivateProfile(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(docId) && docId == 'profile'
+          && isOwnerOrAdmin(userId)
+          && isValidPrivateProfile(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'photoURL', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // Inventory Overrides / Custom Products
+      match /inventory_items/{itemId} {
+        allow get: if isValidId(userId) && isValidId(itemId) && isOwnerOrAdmin(userId);
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(itemId)
+          && isOwnerOrAdmin(userId)
+          && isValidInventoryItem(incoming(), userId)
+          && (!incoming().isDeleted || canAccessAllWarehouses(userId))
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(itemId)
+          && isOwnerOrAdmin(userId)
+          && isValidInventoryItem(incoming(), userId)
+          && canModifyInventoryStocks(userId)
+          && (incoming().isDeleted == existing().isDeleted || canAccessAllWarehouses(userId))
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'sku', 'barcode', 'name', 'category', 'unit', 'defaultBin', 'costPrice',
+            'stockPusat', 'stockMeruya', 'stockDenpasar', 'stockSurabaya',
+            'minStock', 'minPusat', 'minMeruya', 'minDenpasar', 'minSurabaya',
+            'isDeleted', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(itemId) && isOwnerOrAdmin(userId) && canAccessAllWarehouses(userId);
+      }
+
+      // Scan Logs (Enforces operator branch permission on warehouse)
+      match /scan_logs/{logId} {
+        allow get: if isValidId(userId) && isValidId(logId) && isOwnerOrAdmin(userId) && (resource == null || canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(logId)
+          && isOwnerOrAdmin(userId)
+          && isValidScanLog(incoming(), userId)
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(logId)
+          && isOwnerOrAdmin(userId)
+          && isValidScanLog(incoming(), userId)
+          && (canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId))
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['syncedToSheet', 'notes', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(logId) && isOwnerOrAdmin(userId) && (canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+      }
+
+      // Opname Sessions & Item Counts Subcollection
+      match /opname_sessions/{sessionId} {
+        allow get: if isValidId(userId) && isValidId(sessionId) && isOwnerOrAdmin(userId) && (resource == null || canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(sessionId)
+          && isOwnerOrAdmin(userId)
+          && isValidOpnameSession(incoming(), userId)
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(sessionId)
+          && isOwnerOrAdmin(userId)
+          && isValidOpnameSession(incoming(), userId)
+          && (canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId))
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (existing().status != 'completed' || isAdmin())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'status', 'completedAtStr', 'approvedBy', 'targetBinZone', 'title', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(sessionId) && isAdmin();
+
+        match /counts/{countId} {
+          allow get: if isValidId(userId) && isValidId(sessionId) && isValidId(countId) && isOwnerOrAdmin(userId)
+            && (resource == null || (
+              exists(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId))
+              && (
+                canAccessAllWarehouses(userId) ||
+                canAccessWarehouse(userId, get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.warehouse)
+              )
+            ));
+          allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+          allow create: if isValidId(userId) && isValidId(sessionId) && isValidId(countId)
+            && isOwnerOrAdmin(userId)
+            && isValidOpnameCount(incoming(), userId, sessionId)
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && (
+              (
+                exists(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId))
+                && get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.ownerId == userId
+                && (
+                  canAccessAllWarehouses(userId) ||
+                  canAccessWarehouse(userId, get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.warehouse)
+                )
+                && (get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.status != 'completed' || isAdmin())
+              ) || (
+                existsAfter(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId))
+                && getAfter(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.ownerId == userId
+                && (
+                  canAccessAllWarehouses(userId) ||
+                  canAccessWarehouse(userId, getAfter(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.warehouse)
+                )
+              )
+            );
+          allow update: if isValidId(userId) && isValidId(sessionId) && isValidId(countId)
+            && isOwnerOrAdmin(userId)
+            && isValidOpnameCount(incoming(), userId, sessionId)
+            && incoming().ownerId == existing().ownerId
+            && incoming().sessionId == existing().sessionId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && exists(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId))
+            && (
+              canAccessAllWarehouses(userId) ||
+              canAccessWarehouse(userId, get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.warehouse)
+            )
+            && (get(/databases/$(database)/documents/users/$(userId)/opname_sessions/$(sessionId)).data.status != 'completed' || isAdmin())
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'physicalCount', 'difference', 'lastScannedAt', 'notes', 'updatedAt'
+            ]);
+          allow delete: if isValidId(userId) && isValidId(sessionId) && isValidId(countId) && isAdmin();
+        }
+      }
+
+      // Inbound Orders (GR Masuk)
+      match /inbound_orders/{orderId} {
+        allow get: if isValidId(userId) && isValidId(orderId) && isOwnerOrAdmin(userId) && (resource == null || canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(orderId)
+          && isOwnerOrAdmin(userId)
+          && isValidInboundOrder(incoming(), userId)
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(orderId)
+          && isOwnerOrAdmin(userId)
+          && isValidInboundOrder(incoming(), userId)
+          && (canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId))
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (existing().status != 'completed' || isAdmin())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'items', 'status', 'receivedAt', 'receiverOperator', 'notes', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(orderId) && isAdmin();
+      }
+
+      // Outbound Orders (DO Keluar)
+      match /outbound_orders/{orderId} {
+        allow get: if isValidId(userId) && isValidId(orderId) && isOwnerOrAdmin(userId) && (resource == null || canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(orderId)
+          && isOwnerOrAdmin(userId)
+          && isValidOutboundOrder(incoming(), userId)
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(orderId)
+          && isOwnerOrAdmin(userId)
+          && isValidOutboundOrder(incoming(), userId)
+          && (canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId))
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (existing().status != 'dispatched' || isAdmin())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'items', 'status', 'dispatchedAt', 'pickerOperator', 'notes', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(orderId) && isAdmin();
+      }
+
+      // Stock Cards (Kartu Stok)
+      match /stock_cards/{entryId} {
+        allow get: if isValidId(userId) && isValidId(entryId) && isOwnerOrAdmin(userId) && (resource == null || canAccessWarehouse(userId, existing().warehouse) || canAccessAllWarehouses(userId));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(entryId)
+          && isOwnerOrAdmin(userId)
+          && isValidStockCard(incoming(), userId)
+          && canAccessWarehouse(userId, incoming().warehouse)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(entryId)
+          && isAdmin()
+          && isValidStockCard(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['notes', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(entryId) && isAdmin();
+      }
+
+      // Spreadsheet & Webhook Settings
+      match /settings/{settingId} {
+        allow get: if isValidId(userId) && isValidId(settingId) && settingId == 'spreadsheet' && isOwnerOrAdmin(userId);
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(settingId) && settingId == 'spreadsheet'
+          && isOwnerOrAdmin(userId)
+          && isValidSpreadsheetSettings(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(settingId) && settingId == 'spreadsheet'
+          && isOwnerOrAdmin(userId)
+          && isValidSpreadsheetSettings(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'spreadsheetUrl', 'webhookUrl', 'sheetId', 'activeSheetName',
+            'autoSync', 'lastSyncTime', 'status', 'updatedAt'
+          ]);
+        allow delete: if false;
+      }
+
+      // Spreadsheet Sync Queue
+      match /sync_queue/{queueId} {
+        allow get: if isValidId(userId) && isValidId(queueId) && isOwnerOrAdmin(userId)
+          && (resource == null || !isValidWarehouse(existing().warehouse) || canAccessWarehouse(userId, existing().warehouse));
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(queueId)
+          && isOwnerOrAdmin(userId)
+          && isValidSyncQueueItem(incoming(), userId)
+          && (!isValidWarehouse(incoming().warehouse) || canAccessWarehouse(userId, incoming().warehouse))
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(queueId)
+          && isOwnerOrAdmin(userId)
+          && isValidSyncQueueItem(incoming(), userId)
+          && (!isValidWarehouse(existing().warehouse) || canAccessWarehouse(userId, existing().warehouse))
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'errorMessage', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(queueId) && isOwnerOrAdmin(userId)
+          && (!isValidWarehouse(existing().warehouse) || canAccessWarehouse(userId, existing().warehouse));
+      }
+
+      // Accurate Reconciliation Records
+      match /accurate_records/{recordId} {
+        allow get: if isValidId(userId) && isValidId(recordId) && isOwnerOrAdmin(userId);
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(recordId)
+          && isOwnerOrAdmin(userId)
+          && isValidAccurateRecord(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(recordId)
+          && isOwnerOrAdmin(userId)
+          && isValidAccurateRecord(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'category', 'unit', 'accurateBookQty', 'costPerUnit', 'lastUpdated', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(recordId) && isOwnerOrAdmin(userId);
+      }
+
+      // Warehouse Staff Operators (Locked against self-escalation by branch-restricted users)
+      match /operators/{operatorId} {
+        allow get: if isValidId(userId) && isValidId(operatorId) && isOwnerOrAdmin(userId);
+        allow list: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(operatorId)
+          && isOwnerOrAdmin(userId)
+          && (!hasBranchLockedEmail() || operatorId == expectedLockedOperatorId())
+          && isValidWarehouseOperator(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(operatorId)
+          && isOwnerOrAdmin(userId)
+          && (!hasBranchLockedEmail() || isAdmin())
+          && isValidWarehouseOperator(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'nik', 'name', 'role', 'assignedWarehouse', 'warehouseLabel', 'allowedWarehouses', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(operatorId) && (canAccessAllWarehouses(userId) || isAdmin());
+      }
+    }
+  }
+}

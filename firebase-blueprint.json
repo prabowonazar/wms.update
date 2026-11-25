@@ -1,0 +1,985 @@
+{
+  "entities": {
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Public-safe workspace metadata for a signed-in warehouse operator.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the workspace owner."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "activeWarehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "activeOperatorId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "displayName", "activeWarehouse", "createdAt", "updatedAt"]
+    },
+    "WarehouseOperatorDoc": {
+      "title": "WarehouseOperatorDoc",
+      "description": "Official warehouse staff operator profile and assigned branch warehouse.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nik": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "enum": ["operator", "admin", "supervisor"]
+        },
+        "assignedWarehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "warehouseLabel": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "allowedWarehouses": {
+          "type": "array",
+          "description": "Explicit list of branch warehouses accessible by this operator."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "id", "nik", "name", "role", "assignedWarehouse", "warehouseLabel", "createdAt", "updatedAt"]
+    },
+    "UserPrivateProfile": {
+      "title": "UserPrivateProfile",
+      "description": "Isolated PII profile document restricted to owner or admin.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "email", "createdAt", "updatedAt"]
+    },
+    "InventoryItemDoc": {
+      "title": "InventoryItemDoc",
+      "description": "Synchronized inventory item stock, custom product, or deletion tombstone.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "barcode": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "defaultBin": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "stockPusat": {
+          "type": "number"
+        },
+        "stockMeruya": {
+          "type": "number"
+        },
+        "stockDenpasar": {
+          "type": "number"
+        },
+        "stockSurabaya": {
+          "type": "number"
+        },
+        "minStock": {
+          "type": "number"
+        },
+        "minPusat": {
+          "type": "number"
+        },
+        "minMeruya": {
+          "type": "number"
+        },
+        "minDenpasar": {
+          "type": "number"
+        },
+        "minSurabaya": {
+          "type": "number"
+        },
+        "isDeleted": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "sku",
+        "barcode",
+        "name",
+        "category",
+        "unit",
+        "defaultBin",
+        "stockPusat",
+        "stockMeruya",
+        "stockDenpasar",
+        "stockSurabaya",
+        "minStock",
+        "isDeleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ScanLogDoc": {
+      "title": "ScanLogDoc",
+      "description": "Warehouse barcode scan transaction log.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "barcode": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "type": {
+          "type": "string",
+          "enum": ["general_scan", "gr", "do", "opname", "mutation_in", "mutation_out", "inbound", "outbound", "relocation"]
+        },
+        "binLocation": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "lotNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "operatorId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "operatorName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "referenceNo": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "syncedToSheet": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "timestamp",
+        "barcode",
+        "sku",
+        "name",
+        "type",
+        "binLocation",
+        "quantity",
+        "notes",
+        "operatorId",
+        "operatorName",
+        "warehouse",
+        "syncedToSheet",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OpnameSessionDoc": {
+      "title": "OpnameSessionDoc",
+      "description": "Stock opname session header metadata.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "targetBinZone": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "cancelled"]
+        },
+        "createdAtStr": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "completedAtStr": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "operatorName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "approvedBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "code",
+        "title",
+        "warehouse",
+        "targetBinZone",
+        "status",
+        "createdAtStr",
+        "operatorName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OpnameCountDoc": {
+      "title": "OpnameCountDoc",
+      "description": "Individual SKU physical count inside an opname session subcollection.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "barcode": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "binLocation": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "systemStock": {
+          "type": "number"
+        },
+        "physicalCount": {
+          "type": "number"
+        },
+        "difference": {
+          "type": "number"
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "lastScannedAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "sessionId",
+        "sku",
+        "barcode",
+        "name",
+        "binLocation",
+        "systemStock",
+        "physicalCount",
+        "difference",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InboundOrderDoc": {
+      "title": "InboundOrderDoc",
+      "description": "Good Receipt (GR) inbound order document.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "poNumber": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "supplier": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "orderDate": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "receiving", "completed"]
+        },
+        "receivedAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "suratJalanNumber": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "receiverOperator": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "items": {
+          "type": "array",
+          "description": "Bounded up to 100 inbound line items."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "poNumber",
+        "supplier",
+        "orderDate",
+        "warehouse",
+        "status",
+        "items",
+        "suratJalanNumber",
+        "receiverOperator",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OutboundOrderDoc": {
+      "title": "OutboundOrderDoc",
+      "description": "Delivery Order (DO) outbound dispatch document.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "doNumber": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "destination": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "orderDate": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "picking", "dispatched"]
+        },
+        "dispatchedAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "purpose": {
+          "type": "string",
+          "enum": ["Penjualan", "Transfer Cabang", "Retur Supplier", "Pemakaian Internal"]
+        },
+        "driverName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "vehicleNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "pickerOperator": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "items": {
+          "type": "array",
+          "description": "Bounded up to 100 outbound line items."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "doNumber",
+        "destination",
+        "customerName",
+        "orderDate",
+        "warehouse",
+        "status",
+        "purpose",
+        "driverName",
+        "vehicleNumber",
+        "items",
+        "pickerOperator",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StockCardDoc": {
+      "title": "StockCardDoc",
+      "description": "Stock movement ledger entry (Kartu Stok).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "warehouse": {
+          "type": "string",
+          "enum": ["Gudang Pusat", "Gudang Meruya", "Gudang Denpasar", "Gudang Surabaya"]
+        },
+        "referenceNo": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "transactionType": {
+          "type": "string",
+          "enum": [
+            "GR",
+            "DO",
+            "OPNAME_RECONSEL",
+            "MUTASI_MASUK",
+            "MUTASI_KELUAR",
+            "INBOUND",
+            "OUTBOUND",
+            "OPNAME_ADJUSTMENT",
+            "RELOCATION"
+          ]
+        },
+        "qtyIn": {
+          "type": "number"
+        },
+        "qtyOut": {
+          "type": "number"
+        },
+        "balanceAfter": {
+          "type": "number"
+        },
+        "operator": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "date",
+        "sku",
+        "name",
+        "warehouse",
+        "referenceNo",
+        "transactionType",
+        "qtyIn",
+        "qtyOut",
+        "balanceAfter",
+        "operator",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SpreadsheetSettingsDoc": {
+      "title": "SpreadsheetSettingsDoc",
+      "description": "Cloud-persisted Google Spreadsheet & Webhook configuration.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "spreadsheetUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "webhookUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "sheetId": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "activeSheetName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "autoSync": {
+          "type": "boolean"
+        },
+        "lastSyncTime": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": ["connected", "disconnected", "syncing", "error"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "spreadsheetUrl",
+        "sheetId",
+        "activeSheetName",
+        "autoSync",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SyncQueueDoc": {
+      "title": "SyncQueueDoc",
+      "description": "Spreadsheet sync queue item.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "barcode": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "binLocation": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "referenceNo": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "warehouse": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "operator": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "synced", "failed"]
+        },
+        "errorMessage": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "type",
+        "referenceNo",
+        "sku",
+        "name",
+        "quantity",
+        "warehouse",
+        "operator",
+        "timestamp",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AccurateRecordDoc": {
+      "title": "AccurateRecordDoc",
+      "description": "Accurate Online accounting stock record for reconciliation.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "accurateBookQty": {
+          "type": "number"
+        },
+        "costPerUnit": {
+          "type": "number"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "sku",
+        "name",
+        "category",
+        "unit",
+        "accurateBookQty",
+        "costPerUnit",
+        "lastUpdated",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Public-safe operator workspace preferences."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateProfile" },
+      "description": "Isolated user PII (email, avatar URL)."
+    },
+    "/users/{userId}/inventory_items/{itemId}": {
+      "schema": { "$ref": "#/entities/InventoryItemDoc" },
+      "description": "Cloud-synced inventory stock updates and custom items."
+    },
+    "/users/{userId}/scan_logs/{logId}": {
+      "schema": { "$ref": "#/entities/ScanLogDoc" },
+      "description": "Barcode scan history logs."
+    },
+    "/users/{userId}/opname_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/OpnameSessionDoc" },
+      "description": "Stock opname sessions."
+    },
+    "/users/{userId}/opname_sessions/{sessionId}/counts/{countId}": {
+      "schema": { "$ref": "#/entities/OpnameCountDoc" },
+      "description": "Individual item counts within an opname session."
+    },
+    "/users/{userId}/inbound_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/InboundOrderDoc" },
+      "description": "Good Receipt (GR) inbound orders."
+    },
+    "/users/{userId}/outbound_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/OutboundOrderDoc" },
+      "description": "Delivery Order (DO) outbound dispatches."
+    },
+    "/users/{userId}/stock_cards/{entryId}": {
+      "schema": { "$ref": "#/entities/StockCardDoc" },
+      "description": "Warehouse stock ledger entries."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SpreadsheetSettingsDoc" },
+      "description": "Google Spreadsheet & Webhook settings."
+    },
+    "/users/{userId}/sync_queue/{queueId}": {
+      "schema": { "$ref": "#/entities/SyncQueueDoc" },
+      "description": "Queue of pending/synced spreadsheet payloads."
+    },
+    "/users/{userId}/accurate_records/{recordId}": {
+      "schema": { "$ref": "#/entities/AccurateRecordDoc" },
+      "description": "Accurate Online accounting reconciliation records."
+    },
+    "/users/{userId}/operators/{operatorId}": {
+      "schema": { "$ref": "#/entities/WarehouseOperatorDoc" },
+      "description": "Assigned warehouse staff profiles synced with cloud workspace."
+    }
+  }
+}
