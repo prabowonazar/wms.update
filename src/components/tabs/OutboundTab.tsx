@@ -387,7 +387,7 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
         </div>
 
         {/* Active DO Details Card (Sub Fitur 3: Tujuan dan Keterangan) */}
-        {activeOrder && (
+        {activeOrder ? (
           <div className="bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl p-3.5 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -431,6 +431,12 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
               />
             </div>
           </div>
+        ) : (
+          !isCreatingDO && (
+            <div className="text-xs text-zinc-500 py-4 text-center bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl">
+              Belum ada dokumen Delivery Order (DO). Klik tombol &ldquo;Buat DO Baru&rdquo; untuk memulai.
+            </div>
+          )
         )}
       </section>
 

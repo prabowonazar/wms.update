@@ -1740,12 +1740,67 @@ export function subscribeToWarehouseCloud(
     )
   );
 
+  const DUMMY_SCAN_LOG_IDS = new Set([
+    'scan-101',
+    'scan-102',
+    'scan-103',
+    'scan-104',
+    'scan-105',
+    'scan-106',
+  ]);
+  const DUMMY_OPNAME_IDS = new Set(['opname-001']);
+  const DUMMY_INBOUND_IDS = new Set(['inbound-01', 'inbound-02']);
+  const DUMMY_OUTBOUND_IDS = new Set(['outbound-01']);
+  const DUMMY_STOCK_CARD_IDS = new Set([
+    'sc-01',
+    'sc-02',
+    'sc-03',
+    'sc-04',
+    'sc-11',
+    'sc-12',
+    'sc-13',
+    'sc-21',
+    'sc-22',
+    'sc-23',
+    'sc-31',
+    'sc-32',
+  ]);
+  const DUMMY_QUEUE_IDS = new Set(['q-01', 'q-02']);
+  const DUMMY_ACCURATE_DOC_IDS = new Set([
+    'sku_EL-001',
+    'sku_EL-002',
+    'sku_MC-101',
+    'sku_MC-102',
+    'sku_PC-301',
+    'sku_PC-302',
+    'sku_SF-501',
+    'sku_SF-502',
+  ]);
+  const DUMMY_SPREADSHEET_ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+  const attemptedCleanupIds = new Set<string>();
+
+  const tryDeleteDummyDoc = (subcollection: string, docId: string) => {
+    const key = `${subcollection}/${docId}`;
+    if (attemptedCleanupIds.has(key)) return;
+    attemptedCleanupIds.add(key);
+    deleteDoc(doc(db, 'users', uid, subcollection, docId)).catch(() => {
+      // Ignore if rules restrict delete for non-admin accounts; filtered from UI below
+    });
+  };
+
   // 3. Scan Logs
   unsubs.push(
     onSnapshot(
       query(collection(db, 'users', uid, 'scan_logs'), where('ownerId', '==', uid)),
       (snap) => {
         const logs: ScanLog[] = snap.docs
+          .filter((d) => {
+            if (DUMMY_SCAN_LOG_IDS.has(d.id)) {
+              tryDeleteDummyDoc('scan_logs', d.id);
+              return false;
+            }
+            return true;
+          })
           .map((d) => {
             const data = d.data();
             return {
@@ -1783,6 +1838,9 @@ export function subscribeToWarehouseCloud(
 
         for (const d of snap.docs) {
           knownSess.add(d.id);
+          if (DUMMY_OPNAME_IDS.has(d.id)) {
+            continue;
+          }
           const data = d.data();
           const countsPath = `users/${uid}/opname_sessions/${d.id}/counts`;
           let counts: OpnameItemCount[] = [];
@@ -1827,9 +1885,7 @@ export function subscribeToWarehouseCloud(
         }
 
         sessions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        if (sessions.length > 0) {
-          callbacks.onOpnameSessions(sessions);
-        }
+        callbacks.onOpnameSessions(sessions);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/opname_sessions`)
     )
@@ -1842,8 +1898,11 @@ export function subscribeToWarehouseCloud(
       (snap) => {
         const knownInb = getSet(knownInboundDocs, uid);
         const orders: InboundOrder[] = snap.docs
-          .map((d) => {
+          .filter((d) => {
             knownInb.add(d.id);
+            return !DUMMY_INBOUND_IDS.has(d.id);
+          })
+          .map((d) => {
             const data = d.data();
             return {
               id: String(data.id || d.id),
@@ -1860,7 +1919,7 @@ export function subscribeToWarehouseCloud(
             } as InboundOrder;
           })
           .sort((a, b) => b.orderDate.localeCompare(a.orderDate));
-        if (orders.length > 0) callbacks.onInboundOrders(orders);
+        callbacks.onInboundOrders(orders);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/inbound_orders`)
     )
@@ -1873,8 +1932,11 @@ export function subscribeToWarehouseCloud(
       (snap) => {
         const knownOut = getSet(knownOutboundDocs, uid);
         const orders: OutboundOrder[] = snap.docs
-          .map((d) => {
+          .filter((d) => {
             knownOut.add(d.id);
+            return !DUMMY_OUTBOUND_IDS.has(d.id);
+          })
+          .map((d) => {
             const data = d.data();
             return {
               id: String(data.id || d.id),
@@ -1894,7 +1956,7 @@ export function subscribeToWarehouseCloud(
             } as OutboundOrder;
           })
           .sort((a, b) => b.orderDate.localeCompare(a.orderDate));
-        if (orders.length > 0) callbacks.onOutboundOrders(orders);
+        callbacks.onOutboundOrders(orders);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/outbound_orders`)
     )
@@ -1907,8 +1969,11 @@ export function subscribeToWarehouseCloud(
       (snap) => {
         const knownSC = getSet(knownStockCardDocs, uid);
         const entries: StockCardEntry[] = snap.docs
-          .map((d) => {
+          .filter((d) => {
             knownSC.add(d.id);
+            return !DUMMY_STOCK_CARD_IDS.has(d.id);
+          })
+          .map((d) => {
             const data = d.data();
             return {
               id: String(data.id || d.id),
@@ -1926,7 +1991,7 @@ export function subscribeToWarehouseCloud(
             } as StockCardEntry;
           })
           .sort((a, b) => b.date.localeCompare(a.date));
-        if (entries.length > 0) callbacks.onStockCards(entries);
+        callbacks.onStockCards(entries);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/stock_cards`)
     )
@@ -1939,14 +2004,22 @@ export function subscribeToWarehouseCloud(
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
+          const rawUrl = String(data.spreadsheetUrl || '');
+          const rawSheetId = String(data.sheetId || '');
+          const isDummySheet =
+            rawSheetId === DUMMY_SPREADSHEET_ID || rawUrl.includes(DUMMY_SPREADSHEET_ID);
           latestSettings = {
-            spreadsheetUrl: String(data.spreadsheetUrl || ''),
+            spreadsheetUrl: isDummySheet ? '' : rawUrl,
             webhookUrl: data.webhookUrl ? String(data.webhookUrl) : '',
-            sheetId: String(data.sheetId || ''),
-            activeSheetName: String(data.activeSheetName || 'Log_Transaksi'),
-            autoSync: Boolean(data.autoSync),
-            lastSyncTime: data.lastSyncTime ? String(data.lastSyncTime) : undefined,
-            status: data.status || 'connected',
+            sheetId: isDummySheet ? '' : rawSheetId,
+            activeSheetName: String(data.activeSheetName || 'ScanLog_Warehouse_Live'),
+            autoSync: isDummySheet ? false : Boolean(data.autoSync),
+            lastSyncTime: isDummySheet
+              ? undefined
+              : data.lastSyncTime
+              ? String(data.lastSyncTime)
+              : undefined,
+            status: isDummySheet ? 'disconnected' : data.status || 'connected',
           };
           emitConfigIfReady();
         }
@@ -1961,8 +2034,15 @@ export function subscribeToWarehouseCloud(
       (snap) => {
         const knownQ = getSet(knownQueueDocs, uid);
         latestQueue = snap.docs
-          .map((d) => {
+          .filter((d) => {
             knownQ.add(d.id);
+            if (DUMMY_QUEUE_IDS.has(d.id)) {
+              tryDeleteDummyDoc('sync_queue', d.id);
+              return false;
+            }
+            return true;
+          })
+          .map((d) => {
             const data = d.data();
             return {
               id: String(data.id || d.id),
@@ -1994,20 +2074,32 @@ export function subscribeToWarehouseCloud(
       query(collection(db, 'users', uid, 'accurate_records'), where('ownerId', '==', uid)),
       (snap) => {
         const knownAcc = getSet(knownAccurateDocs, uid);
-        const records: AccurateItemRecord[] = snap.docs.map((d) => {
-          knownAcc.add(d.id);
-          const data = d.data();
-          return {
-            sku: String(data.sku || ''),
-            name: String(data.name || ''),
-            category: String(data.category || ''),
-            unit: String(data.unit || 'Pcs'),
-            accurateBookQty: Number(data.accurateBookQty || 0),
-            costPerUnit: Number(data.costPerUnit || 0),
-            lastUpdated: String(data.lastUpdated || ''),
-          };
-        });
-        if (records.length > 0) callbacks.onAccurateRecords(records);
+        const records: AccurateItemRecord[] = snap.docs
+          .filter((d) => {
+            knownAcc.add(d.id);
+            const data = d.data();
+            if (
+              DUMMY_ACCURATE_DOC_IDS.has(d.id) &&
+              String(data.lastUpdated || '') === '2026-10-12 00:00'
+            ) {
+              tryDeleteDummyDoc('accurate_records', d.id);
+              return false;
+            }
+            return true;
+          })
+          .map((d) => {
+            const data = d.data();
+            return {
+              sku: String(data.sku || ''),
+              name: String(data.name || ''),
+              category: String(data.category || ''),
+              unit: String(data.unit || 'Pcs'),
+              accurateBookQty: Number(data.accurateBookQty || 0),
+              costPerUnit: Number(data.costPerUnit || 0),
+              lastUpdated: String(data.lastUpdated || ''),
+            };
+          });
+        callbacks.onAccurateRecords(records);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/accurate_records`)
     )

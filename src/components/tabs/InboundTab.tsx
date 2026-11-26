@@ -342,7 +342,7 @@ export const InboundTab: React.FC<InboundTabProps> = ({
         </div>
 
         {/* Active PO Details Card */}
-        {activeOrder && (
+        {activeOrder ? (
           <div className="bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl p-3.5 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -381,6 +381,12 @@ export const InboundTab: React.FC<InboundTabProps> = ({
               />
             </div>
           </div>
+        ) : (
+          !isCreatingPO && (
+            <div className="text-xs text-zinc-500 py-4 text-center bg-[#F4F5F7] border border-zinc-200/80 rounded-2xl">
+              Belum ada dokumen GR / PO. Klik tombol &ldquo;+ Buat PO / GR Baru&rdquo; untuk memulai.
+            </div>
+          )
         )}
       </section>
 

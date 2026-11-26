@@ -14,7 +14,7 @@ import {
   INITIAL_USERS,
   INITIAL_INVENTORY,
   INITIAL_SCAN_LOGS,
-  INITIAL_OPNAME_SESSION,
+  INITIAL_OPNAME_SESSIONS,
   INITIAL_INBOUND_ORDERS,
   INITIAL_OUTBOUND_ORDERS,
   INITIAL_STOCK_CARD_ENTRIES,
@@ -35,11 +35,54 @@ const KEYS = {
   STOCK_CARDS: 'scangudang_stock_cards',
   SPREADSHEET_CONFIG: 'scangudang_spreadsheet_config',
   ACCURATE_RECORDS: 'scangudang_accurate_records',
-  VIEW_MODE: 'scangudang_view_mode', // 'mobile_frame' | 'responsive'
+  VIEW_MODE: 'scangudang_view_mode',
   SOUND_ENABLED: 'scangudang_sound_enabled',
 };
 
+const DUMMY_CLEANUP_KEY = 'scangudang_dummy_cleanup_rev';
+const CURRENT_DUMMY_CLEANUP_REV = 'cleanup_dummy_20261125_v1';
+
+const DUMMY_SCAN_LOG_IDS = new Set([
+  'scan-101',
+  'scan-102',
+  'scan-103',
+  'scan-104',
+  'scan-105',
+  'scan-106',
+]);
+const DUMMY_OPNAME_IDS = new Set(['opname-001']);
+const DUMMY_INBOUND_IDS = new Set(['inbound-01', 'inbound-02']);
+const DUMMY_OUTBOUND_IDS = new Set(['outbound-01']);
+const DUMMY_STOCK_CARD_IDS = new Set([
+  'sc-01',
+  'sc-02',
+  'sc-03',
+  'sc-04',
+  'sc-11',
+  'sc-12',
+  'sc-13',
+  'sc-21',
+  'sc-22',
+  'sc-23',
+  'sc-31',
+  'sc-32',
+]);
+const DUMMY_QUEUE_IDS = new Set(['q-01', 'q-02']);
+const DUMMY_ACCURATE_SKUS = new Set([
+  'EL-001',
+  'EL-002',
+  'MC-101',
+  'MC-102',
+  'PC-301',
+  'PC-302',
+  'SF-501',
+  'SF-502',
+]);
+const DUMMY_SPREADSHEET_ID = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+
 export class StorageService {
+  private static dummyCleaned = false;
+
   private static getItem<T>(key: string, defaultValue: T): T {
     if (typeof window === 'undefined') return defaultValue;
     try {
@@ -57,6 +100,75 @@ export class StorageService {
     } catch {
       // storage full or quota exceeded
     }
+  }
+
+  private static ensureDummyCleaned(): void {
+    if (typeof window === 'undefined' || this.dummyCleaned) return;
+    this.dummyCleaned = true;
+
+    const currentRev = localStorage.getItem(DUMMY_CLEANUP_KEY);
+    if (currentRev === CURRENT_DUMMY_CLEANUP_REV) return;
+
+    // Strip known dummy records from localStorage while preserving any real user transactions
+    const logs = this.getItem<ScanLog[]>(KEYS.SCAN_LOGS, []);
+    this.setItem(
+      KEYS.SCAN_LOGS,
+      logs.filter((l) => !DUMMY_SCAN_LOG_IDS.has(l.id))
+    );
+
+    const opnames = this.getItem<OpnameSession[]>(KEYS.OPNAME_SESSIONS, []);
+    this.setItem(
+      KEYS.OPNAME_SESSIONS,
+      opnames.filter((s) => !DUMMY_OPNAME_IDS.has(s.id))
+    );
+
+    const inbounds = this.getItem<InboundOrder[]>(KEYS.INBOUND_ORDERS, []);
+    this.setItem(
+      KEYS.INBOUND_ORDERS,
+      inbounds.filter((o) => !DUMMY_INBOUND_IDS.has(o.id))
+    );
+
+    const outbounds = this.getItem<OutboundOrder[]>(KEYS.OUTBOUND_ORDERS, []);
+    this.setItem(
+      KEYS.OUTBOUND_ORDERS,
+      outbounds.filter((o) => !DUMMY_OUTBOUND_IDS.has(o.id))
+    );
+
+    const cards = this.getItem<StockCardEntry[]>(KEYS.STOCK_CARDS, []);
+    this.setItem(
+      KEYS.STOCK_CARDS,
+      cards.filter((c) => !DUMMY_STOCK_CARD_IDS.has(c.id))
+    );
+
+    const cfg = this.getItem<SpreadsheetSyncConfig>(
+      KEYS.SPREADSHEET_CONFIG,
+      INITIAL_SPREADSHEET_CONFIG
+    );
+    const cleanedQueue = Array.isArray(cfg.queue)
+      ? cfg.queue.filter((q) => !DUMMY_QUEUE_IDS.has(q.id))
+      : [];
+    const isDummySheet =
+      cfg.sheetId === DUMMY_SPREADSHEET_ID ||
+      (cfg.spreadsheetUrl || '').includes(DUMMY_SPREADSHEET_ID);
+    this.setItem(KEYS.SPREADSHEET_CONFIG, {
+      ...cfg,
+      spreadsheetUrl: isDummySheet ? '' : cfg.spreadsheetUrl || '',
+      sheetId: isDummySheet ? '' : cfg.sheetId || '',
+      autoSync: isDummySheet ? false : Boolean(cfg.autoSync),
+      lastSyncTime: isDummySheet ? undefined : cfg.lastSyncTime,
+      status: isDummySheet ? 'disconnected' : cfg.status,
+      queue: cleanedQueue,
+    });
+
+    const accs = this.getItem<AccurateItemRecord[]>(KEYS.ACCURATE_RECORDS, []);
+    this.setItem(
+      KEYS.ACCURATE_RECORDS,
+      accs.filter(
+        (a) => !(DUMMY_ACCURATE_SKUS.has(a.sku) && a.lastUpdated === '2026-10-12 00:00')
+      )
+    );
+
+    localStorage.setItem(DUMMY_CLEANUP_KEY, CURRENT_DUMMY_CLEANUP_REV);
   }
 
   // Users / Operators
@@ -113,7 +225,6 @@ export class StorageService {
     const currentStoredRev = typeof window !== 'undefined' ? localStorage.getItem(DB_REV_KEY) : null;
 
     if (currentStoredRev !== CURRENT_REV) {
-      // Direct update to latest uploaded spreadsheet master data
       this.setItem(KEYS.INVENTORY, INITIAL_INVENTORY);
       if (typeof window !== 'undefined') {
         localStorage.setItem(DB_REV_KEY, CURRENT_REV);
@@ -124,10 +235,10 @@ export class StorageService {
     const stored = this.getItem<InventoryItem[]>(KEYS.INVENTORY, INITIAL_INVENTORY);
     if (!stored || stored.length === 0) return INITIAL_INVENTORY;
 
-    // Check if stored has the user's real uploaded items (e.g. ACCL-, CHML-, BELT-)
-    const hasRealItems = stored.some((i) => i.sku.startsWith('ACCL-') || i.sku.startsWith('CHML-') || i.sku.startsWith('BELT-'));
+    const hasRealItems = stored.some(
+      (i) => i.sku.startsWith('ACCL-') || i.sku.startsWith('CHML-') || i.sku.startsWith('BELT-')
+    );
     if (!hasRealItems && INITIAL_INVENTORY.length > 50) {
-      // Overwrite old dummy items with the user's real 990+ products
       this.setItem(KEYS.INVENTORY, INITIAL_INVENTORY);
       return INITIAL_INVENTORY;
     }
@@ -136,7 +247,6 @@ export class StorageService {
     const missing = INITIAL_INVENTORY.filter((i) => !existingSkus.has(i.sku));
     let result = missing.length > 0 ? [...stored, ...missing] : stored;
 
-    // Check if items need minStockPerWarehouse migration
     const needsMigration = result.some((i) => !i.minStockPerWarehouse);
     if (needsMigration) {
       const initialMap = new Map(INITIAL_INVENTORY.map((it) => [it.sku, it]));
@@ -175,6 +285,7 @@ export class StorageService {
 
   // Scan Logs
   static getScanLogs(): ScanLog[] {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.SCAN_LOGS, INITIAL_SCAN_LOGS);
   }
 
@@ -184,7 +295,8 @@ export class StorageService {
 
   // Opname
   static getOpnameSessions(): OpnameSession[] {
-    return this.getItem(KEYS.OPNAME_SESSIONS, [INITIAL_OPNAME_SESSION]);
+    this.ensureDummyCleaned();
+    return this.getItem(KEYS.OPNAME_SESSIONS, INITIAL_OPNAME_SESSIONS);
   }
 
   static saveOpnameSessions(sessions: OpnameSession[]): void {
@@ -193,6 +305,7 @@ export class StorageService {
 
   // Inbound Orders
   static getInboundOrders(): InboundOrder[] {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.INBOUND_ORDERS, INITIAL_INBOUND_ORDERS);
   }
 
@@ -202,6 +315,7 @@ export class StorageService {
 
   // Outbound Orders
   static getOutboundOrders(): OutboundOrder[] {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.OUTBOUND_ORDERS, INITIAL_OUTBOUND_ORDERS);
   }
 
@@ -211,6 +325,7 @@ export class StorageService {
 
   // Stock Cards
   static getStockCards(): StockCardEntry[] {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.STOCK_CARDS, INITIAL_STOCK_CARD_ENTRIES);
   }
 
@@ -220,6 +335,7 @@ export class StorageService {
 
   // Spreadsheet Config
   static getSpreadsheetConfig(): SpreadsheetSyncConfig {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.SPREADSHEET_CONFIG, INITIAL_SPREADSHEET_CONFIG);
   }
 
@@ -229,6 +345,7 @@ export class StorageService {
 
   // Accurate Records
   static getAccurateRecords(): AccurateItemRecord[] {
+    this.ensureDummyCleaned();
     return this.getItem(KEYS.ACCURATE_RECORDS, INITIAL_ACCURATE_RECORDS);
   }
 
@@ -262,13 +379,14 @@ export class StorageService {
     this.setItem(KEYS.SOUND_ENABLED, val);
   }
 
-  // Reset to Factory Default Data
+  // Reset to Clean Master Data
   static resetAll(): void {
     if (typeof window === 'undefined') return;
     localStorage.clear();
+    localStorage.setItem(DUMMY_CLEANUP_KEY, CURRENT_DUMMY_CLEANUP_REV);
     this.saveInventory(INITIAL_INVENTORY);
     this.saveScanLogs(INITIAL_SCAN_LOGS);
-    this.saveOpnameSessions([INITIAL_OPNAME_SESSION]);
+    this.saveOpnameSessions(INITIAL_OPNAME_SESSIONS);
     this.saveInboundOrders(INITIAL_INBOUND_ORDERS);
     this.saveOutboundOrders(INITIAL_OUTBOUND_ORDERS);
     this.saveStockCards(INITIAL_STOCK_CARD_ENTRIES);
