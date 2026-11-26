@@ -69,10 +69,13 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
   // Handle barcode scanned during outbound
   const handleBarcodeDecoded = (code: string) => {
     if (!activeOrder) return;
+    const normalized = code.trim().toLowerCase();
 
     // Check if barcode matches any requested item in DO
     const itemIndex = activeOrder.items.findIndex(
-      (it) => it.barcode === code || it.sku.toLowerCase() === code.toLowerCase()
+      (it) =>
+        it.barcode.trim().toLowerCase() === normalized ||
+        it.sku.trim().toLowerCase() === normalized
     );
 
     if (itemIndex >= 0) {
@@ -111,7 +114,9 @@ export const OutboundTab: React.FC<OutboundTabProps> = ({
     } else {
       // Not in list or unknown
       const master = inventory.find(
-        (m) => m.barcode === code || m.sku.toLowerCase() === code.toLowerCase()
+        (m) =>
+          m.barcode.trim().toLowerCase() === normalized ||
+          m.sku.trim().toLowerCase() === normalized
       );
 
       if (master) {

@@ -63,3 +63,7 @@
   display: none !important;
 }
 
+#warehouse-qr-reader #qr-shaded-region {
+  display: none !important;
+}
+

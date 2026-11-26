@@ -92,7 +92,9 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
     }
 
     const found = inventory.find(
-      (item) => item.barcode === trimmed || item.sku.toLowerCase() === trimmed.toLowerCase()
+      (item) =>
+        item.barcode.trim().toLowerCase() === trimmed.toLowerCase() ||
+        item.sku.trim().toLowerCase() === trimmed.toLowerCase()
     );
 
     if (found) {
@@ -111,9 +113,9 @@ export const ScanLogTab: React.FC<ScanLogTabProps> = ({
   const matchedInventoryItem = inventory.find(
     (item) =>
       (scannedBarcode.trim() &&
-        (item.barcode === scannedBarcode.trim() ||
-          item.sku.toLowerCase() === scannedBarcode.trim().toLowerCase())) ||
-      (itemSku.trim() && item.sku.toLowerCase() === itemSku.trim().toLowerCase())
+        (item.barcode.trim().toLowerCase() === scannedBarcode.trim().toLowerCase() ||
+          item.sku.trim().toLowerCase() === scannedBarcode.trim().toLowerCase())) ||
+      (itemSku.trim() && item.sku.trim().toLowerCase() === itemSku.trim().toLowerCase())
   );
   const currentBranchQty = matchedInventoryItem
     ? matchedInventoryItem.stock[activeWarehouse] || 0

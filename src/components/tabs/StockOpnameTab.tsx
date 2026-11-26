@@ -81,16 +81,21 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
   // Handle barcode scanned during opname
   const handleBarcodeDecoded = (code: string) => {
     if (!activeSession) return;
+    const normalized = code.trim().toLowerCase();
 
     // Find in session items
     let target = activeSession.items.find(
-      (item) => item.barcode === code || item.sku.toLowerCase() === code.toLowerCase()
+      (item) =>
+        item.barcode.trim().toLowerCase() === normalized ||
+        item.sku.trim().toLowerCase() === normalized
     );
 
     if (!target) {
       // Find in master inventory
       const master = inventory.find(
-        (m) => m.barcode === code || m.sku.toLowerCase() === code.toLowerCase()
+        (m) =>
+          m.barcode.trim().toLowerCase() === normalized ||
+          m.sku.trim().toLowerCase() === normalized
       );
       if (master) {
         const newItemCount: OpnameItemCount = {

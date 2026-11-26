@@ -11,6 +11,8 @@ import {
   Focus,
   ZoomIn,
   CheckCircle2,
+  Pause,
+  Play,
   X,
 } from 'lucide-react';
 import { soundService } from '../utils/audio';
@@ -43,6 +45,8 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
   const [manualInput, setManualInput] = useState<string>('');
   const [showManual, setShowManual] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [verifyingText, setVerifyingText] = useState<string | null>(null);
 
   // Zoom & Autofocus state
   const [zoomSupported, setZoomSupported] = useState<boolean>(false);
@@ -61,13 +65,24 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
 
   const html5QrCodeRef = useRef<any>(null);
   const onScanRef = useRef(onScan);
+  const isPausedRef = useRef(false);
   const lastDecodedRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
+  const globalCooldownUntilRef = useRef<number>(0);
+  const candidateRef = useRef<{ code: string; count: number; lastTime: number } | null>(null);
   const scannerContainerId = 'warehouse-qr-reader';
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+    if (isPaused) {
+      candidateRef.current = null;
+      setVerifyingText(null);
+    }
+  }, [isPaused]);
 
   const getActiveVideoTrack = (): MediaStreamTrack | null => {
     const container = document.getElementById(scannerContainerId);
@@ -115,6 +130,8 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
       }
       html5QrCodeRef.current = null;
     }
+    candidateRef.current = null;
+    setVerifyingText(null);
     setCameraActive(false);
     setTorchOn(false);
   }, []);
@@ -131,60 +148,136 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
 
       setCameraError(null);
       setTorchOn(false);
+      candidateRef.current = null;
+      setVerifyingText(null);
 
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
         if (!isMounted) return;
 
         await stopScanner();
 
+        // Restrict to reliable warehouse 1D/2D formats (excludes noisy ITF/CODABAR/RSS that cause phantom jumps)
+        const supportedFormats = [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.PDF_417,
+        ];
+
         const scanner = new Html5Qrcode(scannerContainerId, {
           verbose: false,
-          useBarCodeDetectorIfSupported: true,
+          formatsToSupport: supportedFormats,
+          // ZXing enforces quiet-zone & check digits reliably across mobile browsers and respects qrbox crop
+          useBarCodeDetectorIfSupported: false,
         });
         html5QrCodeRef.current = scanner;
 
-        // Build clean HD video constraints without forcing narrow 1:1 crop
+        // Clean HD video constraints for sharp 1D bar contrast
         const videoConstraints: MediaTrackConstraints = selectedCameraId
           ? {
               deviceId: { exact: selectedCameraId },
               width: { min: 640, ideal: 1280 },
-              height: { min: 480, ideal: 960 },
+              height: { min: 480, ideal: 720 },
             }
           : {
               facingMode: facingMode,
               width: { min: 640, ideal: 1280 },
-              height: { min: 480, ideal: 960 },
+              height: { min: 480, ideal: 720 },
             };
 
         const config = {
-          fps: 14,
-          disableFlip: false,
+          fps: 10,
+          disableFlip: facingMode !== 'user',
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const maxW = Math.max(120, viewfinderWidth - 20);
+            const maxH = Math.max(90, viewfinderHeight - 20);
+            const width = Math.min(maxW, Math.max(180, Math.floor(viewfinderWidth * 0.85)));
+            const height = Math.min(maxH, Math.max(120, Math.floor(viewfinderHeight * 0.55)));
+            return { width, height };
+          },
           videoConstraints,
         };
 
         await scanner.start(
           selectedCameraId ? selectedCameraId : { facingMode },
           config,
-          (decodedText: string) => {
-            const clean = decodedText.trim();
-            if (!clean) return;
+          (decodedText: string, decodedResult?: any) => {
+            if (isPausedRef.current) return;
 
-            // Prevent accidental 15fps burst duplicate scans of the exact same code
+            const clean = decodedText.trim();
+            if (!clean || clean.length < 2) return;
+
             const now = Date.now();
+
+            // 1. Global post-scan lock so camera doesn't jump to another label right after a read
+            if (now < globalCooldownUntilRef.current) {
+              return;
+            }
+
+            // 2. Suppress exact same code repeat within 2.5 seconds
             if (
               lastDecodedRef.current.code === clean &&
-              now - lastDecodedRef.current.time < 1400
+              now - lastDecodedRef.current.time < 2500
             ) {
               return;
             }
+
+            // 3. Multi-frame consensus stabilizer: require consecutive identical reads before accepting
+            const formatId = decodedResult?.result?.format?.format;
+            const is2D =
+              formatId === Html5QrcodeSupportedFormats.QR_CODE ||
+              formatId === Html5QrcodeSupportedFormats.DATA_MATRIX ||
+              formatId === Html5QrcodeSupportedFormats.PDF_417;
+            const requiredMatches = is2D ? 2 : 3;
+
+            const prevCandidate = candidateRef.current;
+            if (
+              prevCandidate &&
+              prevCandidate.code === clean &&
+              now - prevCandidate.lastTime <= 1000
+            ) {
+              const nextCount = prevCandidate.count + 1;
+              candidateRef.current = { code: clean, count: nextCount, lastTime: now };
+
+              if (nextCount < requiredMatches) {
+                setVerifyingText(`${nextCount}/${requiredMatches}`);
+                setTimeout(() => {
+                  if (candidateRef.current && Date.now() - candidateRef.current.lastTime >= 1000) {
+                    candidateRef.current = null;
+                    setVerifyingText(null);
+                  }
+                }, 1050);
+                return;
+              }
+            } else {
+              candidateRef.current = { code: clean, count: 1, lastTime: now };
+              setVerifyingText(`1/${requiredMatches}`);
+              setTimeout(() => {
+                if (candidateRef.current && Date.now() - candidateRef.current.lastTime >= 1000) {
+                  candidateRef.current = null;
+                  setVerifyingText(null);
+                }
+              }, 1050);
+              return;
+            }
+
+            // Consensus reached! Accept and lock briefly to prevent jumping
+            candidateRef.current = null;
+            setVerifyingText(null);
             lastDecodedRef.current = { code: clean, time: now };
+            globalCooldownUntilRef.current = now + 1800;
 
             soundService.playScanBeep();
             setLastScannedFlash(clean);
             setTimeout(() => {
               setLastScannedFlash((prev) => (prev === clean ? null : prev));
-            }, 1300);
+            }, 1700);
 
             onScanRef.current(clean);
           },
@@ -511,17 +604,31 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
             {/* Animated Laser Beam */}
             <div className="absolute left-3 right-3 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_12px_#ef4444] animate-pulse" />
 
-            {/* Scan Confirmed Flash Badge */}
-            {lastScannedFlash ? (
+            {/* Scan Confirmed / Verifying / Paused Flash Badge */}
+            {isPaused ? (
+              <div className="bg-zinc-950/95 border border-amber-400 text-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg">
+                <Pause className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-mono font-black tracking-wide">
+                  SCAN DIJEDA · KLIK LANJUTKAN
+                </span>
+              </div>
+            ) : lastScannedFlash ? (
               <div className="bg-zinc-950/95 border border-[#C6F232] text-[#C6F232] px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in-95">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span className="text-xs font-mono font-black tracking-wide">
                   TERBACA: {lastScannedFlash}
                 </span>
               </div>
+            ) : verifyingText ? (
+              <div className="bg-zinc-950/90 border border-amber-400/80 text-amber-300 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-md">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[11px] font-mono font-bold tracking-wide">
+                  MEMVERIFIKASI ({verifyingText})...
+                </span>
+              </div>
             ) : (
               <span className="absolute -bottom-7 text-[11px] font-mono font-bold tracking-wider text-zinc-100 bg-zinc-950/85 px-2.5 py-0.5 rounded-lg border border-zinc-700/80 whitespace-nowrap">
-                ARAHKAN KE BARCODE · KETUK LAYAR UNTUK FOKUS
+                MASUKKAN BARCODE KE KOTAK · TAHAN SEJENAK
               </span>
             )}
           </div>
@@ -582,11 +689,25 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
           </div>
         )}
 
-        {/* Top-Right HUD Controls: Focus, Switch Lens/Cam, Torch, Fullscreen */}
+        {/* Top-Right HUD Controls: Pause/Resume, Focus, Switch Lens/Cam, Torch, Fullscreen */}
         <div
           onClick={(e) => e.stopPropagation()}
           className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-20"
         >
+          <button
+            type="button"
+            onClick={() => setIsPaused((prev) => !prev)}
+            title={isPaused ? 'Lanjutkan Scan Kamera' : 'Jeda Scan (Kunci Hasil)'}
+            className={`px-2.5 py-2 rounded-xl backdrop-blur border cursor-pointer active:scale-95 transition-all flex items-center gap-1 text-[11px] font-bold ${
+              isPaused
+                ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
+                : 'bg-zinc-900/85 hover:bg-zinc-800 text-zinc-200 border-zinc-700/70'
+            }`}
+          >
+            {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isPaused ? 'Lanjut' : 'Jeda'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => triggerManualRefocus(0.5, 0.5)}
