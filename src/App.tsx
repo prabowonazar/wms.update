@@ -1398,6 +1398,14 @@ export default function App() {
             outboundOrders={outboundOrders}
             onSaveOutboundOrders={handleSaveOutboundOrders}
             onConfirmOutboundDispatch={handleConfirmOutboundDispatch}
+            onLinkItemBarcode={(sku, barcode) => {
+              const updated = inventory.map((item) =>
+                item.sku === sku ? { ...item, barcode } : item
+              );
+              syncInventoryDiff(inventory, updated);
+              setInventory(updated);
+              StorageService.saveInventory(updated);
+            }}
             activeWarehouse={activeWarehouse}
             activeUser={activeUser || users[0]}
             onOpenTestBarcodes={() => setIsBarcodeHelperOpen(true)}
